@@ -289,6 +289,22 @@ def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, forceGroup=2
     rg.setForceGroup(forceGroup)
     return rg
 
+# Implement IDP term into OpenAWSEM. See Wu, J. Phys. Chem. B, 2018, 11115-11125.
+def IDP_term(oa, rg0=0, D=-0.5*kilocalorie_per_mole, alpha=0.001, beta=0.001, gamma=1, atomGroup=-1, forceGroup=27):
+    D = D.value_in_unit(kilojoule_per_mole)
+    nres, ca = oa.nres, oa.ca
+    if atomGroup == -1:
+        group = list(range(nres))
+    else:
+        group = atomGroup          # atomGroup = [0, 1, 10, 12]  means include residue 1, 2, 11, 13. Since the atomGroup numbers do not map to the residue numbers tripping me up. Should update such that atomGroup numbers map propoerly to residue numbers. 
+    n = len(group)
+    rg = rg_term(oa,convertToAngstrom=True)
+    Vrg = CustomCVForce(f"({D}*{n}+{alpha}*(rg-{gamma}*{rg0})^2)/(1+{beta}*(rg-{rg0})^4)")
+    Vrg.addCollectiveVariable("rg", rg)
+    Vrg.setForceGroup(27)
+    return Vrg
+
+
 def cylindrical_rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, forceGroup=27):
     k = k.value_in_unit(kilojoule_per_mole)   # convert to kilojoule_per_mole, openMM default uses kilojoule_per_mole as energy.
     k_rg = oa.k_awsem * k
@@ -296,7 +312,7 @@ def cylindrical_rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, 
     if atomGroup == -1:
         group = list(range(nres))
     else:
-        group = atomGroup          # atomGroup = [0, 1, 10, 12]  means include residue 1, 2, 11, 13.
+        group = atomGroup          # atomGroup = [0, 1, 10, 12]  means include residue 1, 2, 11, 13. Since the atomGroup numbers do not map to the residue numbers tripping me up. Should update such that atomGroup numbers map propoerly to residue numbers. 
     n = len(group)
     normalization = n * n
     rg_square = CustomCompoundBondForce(2, f"1/{normalization}*((x1-x2)^2+(y1-y2)^2)")
