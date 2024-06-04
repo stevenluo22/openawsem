@@ -296,11 +296,17 @@ def IDP_term(oa, rg0=0, D=-0.5*kilocalorie_per_mole, alpha=0.001, beta=0.001, ga
     if atomGroup == -1:
         group = list(range(nres))
     else:
-        group = atomGroup          # atomGroup = [0, 1, 10, 12]  means include residue 1, 2, 11, 13. Since the atomGroup numbers do not map to the residue numbers tripping me up. Should update such that atomGroup numbers map propoerly to residue numbers. 
+        group = atomGroup     # atomGroup = [0, 1, 10, 12]  means include residue 1, 2, 11, 13.
     n = len(group)
-    rg = rg_term(oa,convertToAngstrom=True)
-    Vrg = CustomCVForce(f"({D}*{n}+{alpha}*(rg-{gamma}*{rg0})^2)/(1+{beta}*(rg-{rg0})^4)")
-    Vrg.addCollectiveVariable("rg", rg)
+    normalization = n*n
+    rg_square = CustomBondForce(f"1.0/{normalization}*r^2")
+    for i in group:
+        for j in group:
+            if j <= i:
+                continue
+            rg_square.addBond(ca[i], ca[j], [])
+    Vrg = CustomCVForce(f"({D}*{n}+{alpha}*(rg_square^0.5-{gamma}*{rg0})^2)/(1+{beta}*(rg_square^0.5-{rg0})^4)")
+    Vrg.addCollectiveVariable("rg_square", rg_square)
     Vrg.setForceGroup(27)
     return Vrg
 
