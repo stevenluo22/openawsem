@@ -55,7 +55,7 @@ def read_reference_structure_for_q_calculation_3(oa, pdb_file, reference_chain_n
                     structure_interaction = [i_index, j_index, [gamma_ij, r_ijN, sigma_ij]]
                     structure_interactions.append(structure_interaction)
     # print("Done reading")
-    # print(structure_interactions)
+    print(structure_interactions)
     return structure_interactions
 
 def read_reference_structure_for_qc_calculation(oa, pdb_file, min_seq_sep=3, a=0.1, startResidueIndex=0, endResidueIndex=-1, residueIndexGroup=None):
@@ -150,6 +150,7 @@ def partial_q_value(oa, reference_pdb_file, min_seq_sep=3, a=0.1, startResidueIn
     qvalue.addPerBondParameter("r_ijN")
     qvalue.addPerBondParameter("sigma_ij")
     for structure_interaction in structure_interactions:
+        #print(structure_interaction)
         qvalue.addBond(*structure_interaction)
     qvalue.setForceGroup(forceGroup)
     return qvalue
@@ -289,7 +290,7 @@ def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, forceGroup=2
     rg.setForceGroup(forceGroup)
     return rg
 
-# Implement IDP term into OpenAWSEM. See Wu, J. Phys. Chem. B, 2018, 11115-11125.
+# Implement Wu's Rg term into OpenAWSEM. See Wu, J. Phys. Chem. B, 2018, 11115-11125.
 def IDP_term(oa, rg0=0, D=-0.5*kilocalorie_per_mole, alpha=0.001, beta=0.001, gamma=1, atomGroup=-1, forceGroup=27):
     D = D.value_in_unit(kilojoule_per_mole)
     nres, ca = oa.nres, oa.ca
