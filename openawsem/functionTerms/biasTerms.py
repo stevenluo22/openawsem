@@ -267,6 +267,29 @@ def rg_term(oa, convertToAngstrom=True):
     rg.setForceGroup(2)
     return rg
 
+def partial_rg_term(oa, startResidueIndex=0, endResidueIndex=-1, residueIndexGroup=None, convertToAngstrom=True):
+    parser = PDBParser()
+    structure = parser.get_structure('X', pdb_file)
+    if endResidueIndex == -1:
+        endResidueIndex = len(list(structure.get_residues()))
+    if residueIndexGroup is None:
+        # residueIndexGroup is used for non-continuous residues that used for Q computation.
+        residueIndexGroup = range(startResidueIndex, endResidueIndex)
+    rg_square = CustomBondForce("1/normalization*r^2")
+    # rg = CustomBondForce("1")
+    rg_square.addGlobalParameter("normalization", len(residueIndexGroup)*len(residueIndexGroup))
+    for i in residueIndexGroup:
+        for j in range(i+1, residueIndexGroup):
+            rg_square.addBond(oa.ca[i], oa.ca[j], [])
+    if convertToAngstrom:
+        unit = 10
+    else:
+        unit = 1
+    rg = CustomCVForce(f"{unit}*rg_square^0.5")
+    rg.addCollectiveVariable("rg_square", rg_square)
+    rg.setForceGroup(2)
+    return rg
+
 def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, forceGroup=27):
     k = k.value_in_unit(kilojoule_per_mole)   # convert to kilojoule_per_mole, openMM default uses kilojoule_per_mole as energy.
     k_rg = oa.k_awsem * k
