@@ -268,10 +268,8 @@ def rg_term(oa, convertToAngstrom=True):
     return rg
 
 def partial_rg_term(oa, startResidueIndex=0, endResidueIndex=-1, residueIndexGroup=None, convertToAngstrom=True):
-    parser = PDBParser()
-    structure = parser.get_structure('X', pdb_file)
     if endResidueIndex == -1:
-        endResidueIndex = len(list(structure.get_residues()))
+        endResidueIndex = oa.nres
     if residueIndexGroup is None:
         # residueIndexGroup is used for non-continuous residues that used for Q computation.
         residueIndexGroup = range(startResidueIndex, endResidueIndex)
@@ -279,7 +277,9 @@ def partial_rg_term(oa, startResidueIndex=0, endResidueIndex=-1, residueIndexGro
     # rg = CustomBondForce("1")
     rg_square.addGlobalParameter("normalization", len(residueIndexGroup)*len(residueIndexGroup))
     for i in residueIndexGroup:
-        for j in range(i+1, residueIndexGroup):
+        for j in residueIndexGroup:
+            if (j <= i):
+                continue
             rg_square.addBond(oa.ca[i], oa.ca[j], [])
     if convertToAngstrom:
         unit = 10
