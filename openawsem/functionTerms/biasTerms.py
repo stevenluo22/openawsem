@@ -134,8 +134,9 @@ def qc_value(oa, reference_pdb_file, min_seq_sep=10, a=0.2):
     qvalue.setForceGroup(3)
     return qvalue
 
-def partial_q_value(oa, reference_pdb_file, min_seq_sep=3, a=0.1, startResidueIndex=0, endResidueIndex=-1, residueIndexGroup=None, forceGroup=4):
-    print(f"Including partial q value computation, start residue index: {startResidueIndex}, end residue index: {endResidueIndex}, residueIndexGroup: {residueIndexGroup}")
+def partial_q_value(oa, reference_pdb_file, min_seq_sep=3, a=0.1, startResidueIndex=0, endResidueIndex=-1, residueIndexGroup=None, print_residues = False, forceGroup=4):
+    if print_residues:
+        print(f"Including partial q value computation, start residue index: {startResidueIndex}, end residue index: {endResidueIndex}, residueIndexGroup: {residueIndexGroup}")
     # create bonds
     # structure_interactions = oa.read_reference_structure_for_q_calculation(reference_pdb_file, reference_chain_name, min_seq_sep=min_seq_sep, max_seq_sep=max_seq_sep, contact_threshold=contact_threshold)
     structure_interactions = read_reference_structure_for_qc_calculation(oa, reference_pdb_file, min_seq_sep=min_seq_sep, a=a, startResidueIndex=startResidueIndex, endResidueIndex=endResidueIndex, residueIndexGroup=residueIndexGroup)
