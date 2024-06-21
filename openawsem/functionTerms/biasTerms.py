@@ -291,7 +291,7 @@ def partial_rg_term(oa, startResidueIndex=0, endResidueIndex=-1, residueIndexGro
     rg.setForceGroup(2)
     return rg
 
-def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, forceGroup=27):
+def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, forceGroup=27):  #rg0 should be in nanometers.
     k = k.value_in_unit(kilojoule_per_mole)   # convert to kilojoule_per_mole, openMM default uses kilojoule_per_mole as energy.
     k_rg = oa.k_awsem * k
     nres, ca = oa.nres, oa.ca
@@ -315,7 +315,7 @@ def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, forceGroup=2
     return rg
 
 # Implement Wu's Rg term into OpenAWSEM. See Wu, J. Phys. Chem. B, 2018, 11115-11125.
-def IDP_term(oa, rg0=0, D=-0.5*kilocalorie_per_mole, alpha=0.001, beta=0.001, gamma=1, atomGroup=-1, forceGroup=27):
+def IDP_term(oa, rg0=0, D=-0.5*kilocalorie_per_mole, alpha=0.001, beta=0.001, gamma=1, atomGroup=-1, forceGroup=27): #
     D = D.value_in_unit(kilojoule_per_mole)
     nres, ca = oa.nres, oa.ca
     if atomGroup == -1:
@@ -324,7 +324,7 @@ def IDP_term(oa, rg0=0, D=-0.5*kilocalorie_per_mole, alpha=0.001, beta=0.001, ga
         group = atomGroup     # atomGroup = [0, 1, 10, 12]  means include residue 1, 2, 11, 13.
     n = len(group)
     normalization = n*n
-    rg_square = CustomBondForce(f"1.0/{normalization}*r^2")
+    rg_square = CustomBondForce(f"0.01/{normalization}*r^2")
     for i in group:
         for j in group:
             if j <= i:
