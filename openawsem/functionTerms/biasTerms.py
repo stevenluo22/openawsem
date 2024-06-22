@@ -324,7 +324,7 @@ def IDP_term(oa, rg0=0, D=-0.5*kilocalorie_per_mole, alpha=0.001, beta=0.001, ga
         group = atomGroup     # atomGroup = [0, 1, 10, 12]  means include residue 1, 2, 11, 13.
     n = len(group)
     normalization = n*n
-    rg_square = CustomBondForce(f"100/{normalization}*r^2")
+    rg_square = CustomBondForce(f"100/{normalization}*r^2")  #100 factor converts Rg from input described in nm to output in Angstroms
     for i in group:
         for j in group:
             if j <= i:
