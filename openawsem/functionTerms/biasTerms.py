@@ -315,8 +315,11 @@ def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, forceGroup=1
     return rg
 
 # Implement Wu's Rg term into OpenAWSEM. See Wu, J. Phys. Chem. B, 2018, 11115-11125.
-def IDP_term(oa, rg0=0, D=-0.5*kilocalorie_per_mole, alpha=0.001, beta=0.001, gamma=1, atomGroup=-1, forceGroup=11): #rg0 should be in Angstroms
+def IDP_term(oa, rg0=0*angstrom, D=-0.5*kilocalorie_per_mole, alpha=0.001*kilocalorie_per_mole/angstrom**2, beta=0.001/angstrom**4, gamma=1.1, atomGroup=-1, forceGroup=11):
     D = D.value_in_unit(kilojoule_per_mole)
+    rg0 = rg0.value_in_unit(angstrom)
+    alpha = alpha.value_in_unit(kilojoule_per_mole/angstrom**2)
+    beta = beta.value_in_unit(angstrom**-4)
     nres, ca = oa.nres, oa.ca
     if atomGroup == -1:
         group = list(range(nres))
@@ -324,12 +327,13 @@ def IDP_term(oa, rg0=0, D=-0.5*kilocalorie_per_mole, alpha=0.001, beta=0.001, ga
         group = atomGroup     # atomGroup = [0, 1, 10, 12]  means include residue 1, 2, 11, 13.
     n = len(group)
     normalization = n*n
-    rg_square = CustomBondForce(f"100/{normalization}*r^2")  #100 factor converts Rg from input described in nm to output in Angstroms
+    rg_square = CustomBondForce(f"100/{normalization}*r^2")  #100 factor converts Rg from simulation described in nm to output in Angstroms. Rg^2 is in A^2.
     for i in group:
         for j in group:
             if j <= i:
                 continue
             rg_square.addBond(ca[i], ca[j], [])
+    print(f"({D}*{n}+{alpha}*(rg_square^0.5-{gamma}*{rg0})^2)/(1+{beta}*(rg_square^0.5-{rg0})^4)")
     Vrg = CustomCVForce(f"({D}*{n}+{alpha}*(rg_square^0.5-{gamma}*{rg0})^2)/(1+{beta}*(rg_square^0.5-{rg0})^4)")
     Vrg.addCollectiveVariable("rg_square", rg_square)
     Vrg.setForceGroup(27)
