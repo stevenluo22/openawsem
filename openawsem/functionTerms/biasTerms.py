@@ -291,8 +291,9 @@ def partial_rg_term(oa, startResidueIndex=0, endResidueIndex=-1, residueIndexGro
     rg.setForceGroup(2)
     return rg
 
-def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, forceGroup=11):  #rg0 should be in nanometers.
+def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0*nanometer, atomGroup=-1, forceGroup=11):  #rg0 should be in nanometers.
     k = k.value_in_unit(kilojoule_per_mole)   # convert to kilojoule_per_mole, openMM default uses kilojoule_per_mole as energy.
+    rg0 = rg0.value_in_unit(nanometer)
     k_rg = oa.k_awsem * k
     nres, ca = oa.nres, oa.ca
     if atomGroup == -1:
