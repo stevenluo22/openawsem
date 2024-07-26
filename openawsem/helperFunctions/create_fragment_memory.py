@@ -216,8 +216,8 @@ def download_pdb_seqres(pdb_seqres):
     pdb_seqres=Path(pdb_seqres)
     if not pdb_seqres.exists():
         import urllib
-        logging.warning("pdb_seqres.txt was not found. Attempting download from ftp://ftp.wwpdb.org/pub/pdb/derived_data/pdb_seqres.txt")
-        url = "ftp://ftp.wwpdb.org/pub/pdb/derived_data/pdb_seqres.txt"
+        logging.warning("pdb_seqres.txt was not found. Attempting download from https://files.wwpdb.org/pub/pdb/derived_data/pdb_seqres.txt")
+        url = "https://files.wwpdb.org/pub/pdb/derived_data/pdb_seqres.txt"
         try:
             urllib.request.urlretrieve(url, pdb_seqres)
             logging.info(f"Download complete. Saved to {pdb_seqres}")
