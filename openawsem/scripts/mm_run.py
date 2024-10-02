@@ -221,7 +221,7 @@ def main(args=None):
     parser.add_argument("--subMode", type=int, default=-1)
     parser.add_argument("-f", "--forces", default="forces_setup.py")
     parser.add_argument("--parameters", default=None)
-    parser.add_argument("-r", "--reportFrequency", type=int, default=-1, help="default value step/400")
+    parser.add_argument("-r", "--reportFrequency", type=int, default=-1, help="default value: total number of steps / 400, resulting in 400 total frames")
     parser.add_argument("--fromOpenMMPDB", action="store_true", default=False)
     parser.add_argument("--fasta", type=str, default="crystal_structure.fasta")
     parser.add_argument("--timeStep", type=int, default=2)
