@@ -79,19 +79,78 @@ def run(args):
     checkpoint_reporter_frequency = 10000
 
 
-
-    snapShotCount = 400
-    stepsPerT = int(args.steps/snapShotCount)
+    ## Configure number of timesteps and number of frames/recording interval
+    # do some basic checks on user input
+    if args.steps < 1:
+        raise ValueError("Number of timesteps --steps must be a positive integer")
+    else:
+        total_steps = args.steps
+    if args.numFrames > total_steps:
+        # the user has asked for more frames than timesteps
+        raise ValueError("Number of frames --numFrames cannot be greater than number of timesteps --steps")
+    elif args.numFrames == 0:
+        # the user has asked us to run a simulation with 0 frames
+        raise ValueError("Number of frames --numFrames cannot be zero")
+    if int(total_steps/args.reportFrequency) == 0: # int trucates so it works like the floor function for positive numbers
+        # the user has asked us to run a simulation with 0 frames
+        raise ValueError("Number of frames implied by --reportFrequency (calculated as NUM_TIMESTEPS/REPORT_FREQUENCY) must be at least 1")
+    if args.reportFrequency != -1 and args.numFrames != -1:
+        # The user has specified both --reportFrequency and --numFrames. We raise an error unless these directions are perfectly unambiguous.
+        if not (total_steps/args.reportFrequency).is_integer():
+            raise ValueError("Number of timesteps --steps is not divisible by the number of frames implied by --reportFrequency (calculated as NUM_TIMESTEPS/REPORT_FREQUENCY).")
+        elif args.numFrames != total_steps/args.reportFrequency:
+            raise ValueError("Number of frames from --numFrames and number of frames implied by --reportFrequency (calculated as NUM_TIMESTEPS/REPORT_FREQUENCY) disagree.\n\
+                             Hint: you only need to give either --reportFrequency or --numFrames on the command line, not both.") 
+    # assign number of frames, report frequency, and annealing parameters
+    if args.reportFrequency == args.numFrames == -1:
+        # the user has specified neither, so we revert to default
+        logging.warning("    Not specified: (number of frames --numFrames OR frame reporting interval --reportFrequency), therefore reverting to default of 400 frames.")
+        num_frames = 400
+        if total_steps < 400:
+            raise ValueError("Number of frames cannot be greater than number of timesteps --steps")
+        if not (total_steps / num_frames).is_integer():
+            logging.warning(f"    Number of timesteps --steps is not divisible by the number of frames. Increasing number of timesteps so that the simulation ends with a complete frame.")
+            # we are not allowed to override the number of frames
+            # so we need to increase the value of total_steps such that is it an integer multiple of 
+            # (because we can't have a fractional reporting frequency)
+            # we do this by round total_steps/num_frames up to the nearest integer, then multiplying by num_frames
+            total_steps = (int(total_steps/num_frames)+1) * num_frames
+        reporter_frequency = total_steps / num_frames
+    elif args.numFrames != -1:
+        # the user has specified --numFrames
+        # if the user also specified --reportFrequency, then report frequency agrees with --numFrames (due to above check)
+        num_frames = args.numFrames
+        if not (total_steps / num_frames).is_integer():
+            logging.warning(f"    Number of timesteps --steps is not divisible by the number of frames. Increasing number of timesteps so that the simulation ends with a complete frame.")
+            # we are not allowed to override the number of frames
+            # so we need to increase the value of total_steps such that it is an integer multiple of num_frames
+            # (because we can't have a fractional reporting frequency)
+            # we do this by rounding total_steps/num_frames up to the nearest integer, then multiplying by num_frames
+            total_steps = (int(total_steps/num_frames)+1) * num_frames
+        reporter_frequency = total_steps / num_frames
+    elif args.reportFrequency != -1:
+        # the user has specified --reportFrequency but not --numFrames
+        reporter_frequency = args.reportFrequency
+        if not (total_steps/reporter_frequency).is_integer():
+            logging.warning(f"    Number of timesteps --steps is not divisible by the recording interval. Increasing number of timesteps so that the simulation ends with a complete frame.")
+            # we are not allowed to override the reporting interval
+            # so we need to increase the value of total_steps such that it is an integer multiple of reporter_frequency
+            # (because we can't have a fractional number of frames)
+            # we do this by rounding total_steps/reporter_frequency up to the nearest integer, then multiplying by reporter_frequency
+            total_steps = (int(total_steps/reporter_frequency)+1) * reporter_frequency
+        num_frames = total_steps / reporter_frequency
+    else:
+        raise AssertionError(f"Logical error in if-elif-elif, which should catch every case. frame: {args.numFrames}, frequency: {args.reportFrequency}")
     Tstart = args.tempStart
     Tend = args.tempEnd
-    if args.reportFrequency == -1:
-        if stepsPerT == 0:
-            reporter_frequency = 4000
-        else:
-            reporter_frequency = stepsPerT
-    else:
-        reporter_frequency = args.reportFrequency
-    # reporter_frequency = 4000
+    # make sure everything aggrees
+    assert reporter_frequency * num_frames == total_steps, f"reporter_frequency: {reporter_frequency}, num_frames: {num_frames}, total_steps: {total_steps}"
+    assert reporter_frequency.is_integer(), f"reporter_frequency: {reporter_frequency}, num_frames: {num_frames}, total_steps: {total_steps}"
+    assert num_frames.is_integer(), f"reporter_frequency: {reporter_frequency}, num_frames: {num_frames}, total_steps: {total_steps}"
+    reporter_frequency = int(reporter_frequency) # openmm functions want input type to be integer, not just integer-valued float
+    num_frames = int(num_frames) # openmm functions want input type to be integer, not just integer-valued float
+    total_steps = int(total_steps) # openmm functions want input type to be integer, not just integer-valued float
+
 
     print(f"using force setup file from {forceSetupFile}")
     spec = importlib.util.spec_from_file_location("forces", forceSetupFile)
@@ -142,6 +201,7 @@ def run(args):
 
 
     print("reporter_frequency", reporter_frequency)
+    print("num_frames", num_frames)
     simulation.reporters.append(StateDataReporter(sys.stdout, reporter_frequency, step=True, potentialEnergy=True, temperature=True))  # output energy and temperature during simulation
     simulation.reporters.append(StateDataReporter(os.path.join(toPath, "output.log"), reporter_frequency, step=True, potentialEnergy=True, temperature=True)) # output energy and temperature to a file
     simulation.reporters.append(PDBReporter(os.path.join(toPath, "movie.pdb"), reportInterval=reporter_frequency))  # output PDBs of simulated structures
@@ -156,10 +216,11 @@ def run(args):
     if args.simulation_mode == 0:
         simulation.step(int(args.steps))
     elif args.simulation_mode == 1:
-        deltaT = (Tend - Tstart) / snapShotCount
-        for i in range(snapShotCount):
+        deltaT = (Tend - Tstart) / num_frames
+        for i in range(num_frames):
             integrator.setTemperature((Tstart + deltaT*i)*kelvin)
-            simulation.step(stepsPerT)
+            simulation.step(reporter_frequency) # remeber, reporter_frequency is the number of timesteps per frame--probably the inverse of how you would expect it to be defined
+
             # simulation.saveCheckpoint('step_%d.chk' % i)
             # simulation.context.setParameter("k_membrane", 0)
             # if i < snapShotCount/2:
@@ -200,6 +261,7 @@ def run(args):
         additional_cmd = ""
     os.system(f"{sys.executable} mm_analyze.py {args.protein} -t {os.path.join(toPath, 'movie.dcd')} --subMode {args.subMode} -f {args.forces} {analysis_fasta} {additional_cmd} -c {chain}")
 
+
 def main(args=None):
     parser = argparse.ArgumentParser(
         description="This is a python3 script to automatically copy the template file and run simulations")
@@ -221,7 +283,8 @@ def main(args=None):
     parser.add_argument("--subMode", type=int, default=-1)
     parser.add_argument("-f", "--forces", default="forces_setup.py")
     parser.add_argument("--parameters", default=None)
-    parser.add_argument("-r", "--reportFrequency", type=int, default=-1, help="default value: total number of steps / 400, resulting in 400 total frames")
+    parser.add_argument("-r", "--reportFrequency", type=int, default=-1, help="Frequency of timesteps measured against the reporter (record frame every N timesteps). Default value: total number of steps / 400")
+    parser.add_argument("--numFrames", type=int, default=-1, help="Number of frames to record. Timesteps will be 'wasted' at the end of simulation if number of timesteps is not divisible by number of frames. Default value: 400")
     parser.add_argument("--fromOpenMMPDB", action="store_true", default=False)
     parser.add_argument("--fasta", type=str, default="crystal_structure.fasta")
     parser.add_argument("--timeStep", type=int, default=2)
