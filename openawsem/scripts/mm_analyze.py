@@ -15,8 +15,6 @@ from openawsem import *
 from openawsem.helperFunctions.myFunctions import *
 
 def analyze(args):
-    print("exiting")
-    raise SystemeExit()
     if (args.debug):
         do = print
         cd = print
@@ -83,9 +81,6 @@ def analyze(args):
         print(f"Unknown fileType {fileType}")
     # pdb_trajectory = read_trajectory_pdb_positions(trajectoryPath)
 
-    print('printing pdb_trajectory')
-    print(len(pdb_trajectory))
-    raise SystemExit()
 
     oa = OpenMMAWSEMSystem(input_pdb_filename, chains=chain, k_awsem=1.0, xml_filename=openawsem.xml, seqFromPdb=seq, includeLigands=args.includeLigands)  # k_awsem is an overall scaling factor that will affect the relevant temperature scales
 
