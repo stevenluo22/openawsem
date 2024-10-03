@@ -79,73 +79,6 @@ def run(args):
     checkpoint_reporter_frequency = 10000
 
 
-    ## Configure number of timesteps and number of frames/recording interval
-    # assign number of timesteps
-    if args.steps < 1:
-        logging.warning("--steps must be a positive integer. Reverting to default 1e7")
-        total_steps = 1e7
-    else:
-        total_steps = args.steps
-    # merge input from deprecated option --reportFrequency to option --reportInterval and set number of frames
-    if args.reportFrequency != args.reportInterval:
-        if args.numFrames != -1:
-            logging.warning("     --reportFrequency/--reportInterval take priority over --numFrames. Ignoring user-specified --numFrames.")
-        if args.reportInterval == 1000: # we've specified report frequency but not report interval
-            logging.warning("     Deprecation Warning: --reportFrequency is deprecated in favor of --reportInverval, which does the same thing")
-            logging.warning("     Assigning value of --reportFrequency to --reportInterval")
-            report_interval = args.reportFrequency
-        elif args.reportFrequency == 1000: # we've specified report interval but not report frequency
-            report_interval = args.reportInterval
-        else: # neither are the default value of 1000, so we interpret this as a contradiction
-            logging.warning("     Deprecation Warning: --reportFrequency is deprecated in favor of --reportInverval, which does the same thing")
-            logging.warning("     Reporting interval from --reportFrequency and --reportInterval disagree. Using value from --reportInterval")
-            report_interval = args.reportInterval
-        num_frames = int(total_steps/report_interval)
-    elif args.reportFrequency == args.reportInterval == 1000: # both equal to default, so try to get number of frames
-        if args.numFrames == -1: # number of frames not specified, so we can revert to default interval of 1000
-            report_interval = 1000
-            num_frames = int(total_steps/report_interval)
-        else: # use given number of frames
-            num_frames = args.numFrames
-            if args.numFrames > total_steps:
-                # the user has asked for more frames than timesteps
-                logging.warning("Number of frames --numFrames cannot be greater than number of timesteps --steps. Setting number of frames to number of steps.")
-                args.numFrames = total_steps
-                report_interval = int(total_steps/num_frames)
-            elif args.numFrames == 0:
-                # the user has asked us to run a simulation with 0 frames
-                logging.warning("Number of frames --numFrames cannot be zero. Reverting to default of NUM_TIMESTEPS/REPORT_INTERVAL, where REPORT_INTERVAL takes the default value of 1000")
-                report_interval = 1000
-                num_frames = int(total_steps/report_interval)
-            else:
-                report_interval = int(total_steps/num_frames)
-    else: # --reportInterval and --reportFrequency equal to each other but not equal to 1000
-        if args.numFrames != -1:
-            logging.warning("     --reportFrequency/--reportInterval take priority over --numFrames. Ignoring user-specified --numFrames.")
-        report_interval = args.reportInterval
-        num_frames = int(total_steps/report_interval)
-    # check number of frames
-    if num_frames == 0:
-        # the user has asked us to run a simulation with 0 frames
-        logging.warning("You have requested a simulation that contains less than 1 complete frame. Setting number of frames to min(1000, number of timesteps).")
-        num_frames = min([1000,total_steps])
-    assert num_frames <= total_steps, f"num_frames: {num_frames}, total_steps:{total_steps}" # this should be taken care of by earlier code
-    # adjust total number of timesteps so that simulation ends on a complete frame
-    if not (total_steps / num_frames).is_integer():
-        logging.warning(f"    Number of timesteps --steps is not divisible by the number of frames. Increasing number of timesteps so that the simulation ends with a complete frame.")
-        # we are not allowed to override the number of frames
-        # we need to increase the value of total_steps such that it is an integer multiple of num_frames
-        # (because we don't want to override the report frequency that we've already chosen)
-        # we do this by rounding total_steps/num_frames up to the nearest integer, then multiplying by num_frames
-        total_steps = (int(total_steps/num_frames)+1) * num_frames
-        report_interval = total_steps / num_frames
-    # make sure everything aggrees
-    assert report_interval * num_frames == total_steps, f"report_interval: {report_interval}, num_frames: {num_frames}, total_steps: {total_steps}"
-    assert report_interval.is_integer(), f"report_interval: {report_interval}, num_frames: {num_frames}, total_steps: {total_steps}"
-    assert num_frames.is_integer(), f"report_interval: {report_interval}, num_frames: {num_frames}, total_steps: {total_steps}"
-    report__interval = int(report_interval) # openmm functions want input type to be integer, not just integer-valued float
-    num_frames = int(num_frames) # openmm functions want input type to be integer, not just integer-valued float
-    total_steps = int(total_steps) # openmm functions want input type to be integer, not just integer-valued float
     # assign annealing parameters
     Tstart = args.tempStart
     Tend = args.tempEnd
@@ -198,20 +131,20 @@ def run(args):
         simulation.minimizeEnergy()  # first, minimize the energy to a local minimum to reduce any large forces that might be present
 
 
-    print("report_interval", report_interval)
-    print("num_frames", num_frames)
-    simulation.reporters.append(StateDataReporter(sys.stdout, report_interval, step=True, potentialEnergy=True, temperature=True))  # output energy and temperature during simulation
-    simulation.reporters.append(StateDataReporter(os.path.join(toPath, "output.log"), report_interval, step=True, potentialEnergy=True, temperature=True)) # output energy and temperature to a file
-    simulation.reporters.append(PDBReporter(os.path.join(toPath, "movie.pdb"), reportInterval=report_interval))  # output PDBs of simulated structures
-    simulation.reporters.append(DCDReporter(os.path.join(toPath, "movie.dcd"), reportInterval=report_interval, append=True))  # output PDBs of simulated structures
+    print("report_interval", args.reportInterval)
+    print("num_frames", args.numFrames)
+    simulation.reporters.append(StateDataReporter(sys.stdout, args.reportInterval, step=True, potentialEnergy=True, temperature=True))  # output energy and temperature during simulation
+    simulation.reporters.append(StateDataReporter(os.path.join(toPath, "output.log"), args.reportInterval, step=True, potentialEnergy=True, temperature=True)) # output energy and temperature to a file
+    simulation.reporters.append(PDBReporter(os.path.join(toPath, "movie.pdb"), reportInterval=args.reportInterval))  # output PDBs of simulated structures
+    simulation.reporters.append(DCDReporter(os.path.join(toPath, "movie.dcd"), reportInterval=args.reportInterval, append=True))  # output PDBs of simulated structures
     # simulation.reporters.append(DCDReporter(os.path.join(args.to, "movie.dcd"), 1))  # output PDBs of simulated structures
     # simulation.reporters.append(PDBReporter(os.path.join(args.to, "movie.pdb"), 1))  # output PDBs of simulated structures
     simulation.reporters.append(CheckpointReporter(os.path.join(toPath, checkpoint_file), checkpoint_reporter_frequency))  # save progress during the simulation
 
     if args.dryRun:
         if args.simulation_mode == 1: # test temperature setting
-            deltaT = (Tend - Tstart) / num_frames
-            for i in range(num_frames):
+            deltaT = (Tend - Tstart) / args.numFrames
+            for i in range(args.numFrames):
                 integrator.setTemperature((Tstart + deltaT*i)*kelvin)
         raise SystemExit("Simulation configured successfully")
 
@@ -221,10 +154,10 @@ def run(args):
     if args.simulation_mode == 0:
         simulation.step(int(args.steps))
     elif args.simulation_mode == 1:
-        deltaT = (Tend - Tstart) / num_frames
-        for i in range(num_frames):
+        deltaT = (Tend - Tstart) / args.numFrames
+        for i in range(args.numFrames):
             integrator.setTemperature((Tstart + deltaT*i)*kelvin)
-            simulation.step(report_interval) 
+            simulation.step(args.reportInterval) 
 
             # simulation.saveCheckpoint('step_%d.chk' % i)
             # simulation.context.setParameter("k_membrane", 0)
@@ -267,6 +200,8 @@ def run(args):
     os.system(f"{sys.executable} mm_analyze.py {args.protein} -t {os.path.join(toPath, 'movie.dcd')} --subMode {args.subMode} -f {args.forces} {analysis_fasta} {additional_cmd} -c {chain}")
 
 
+
+
 def main(args=None):
     parser = argparse.ArgumentParser(
         description="This is a python3 script to automatically copy the template file and run simulations")
@@ -277,7 +212,7 @@ def main(args=None):
     parser.add_argument("-c", "--chain", type=str, default="-1")
     parser.add_argument("-t", "--thread", type=int, default=-1, help="default is using all that is available")
     parser.add_argument("-p", "--platform", type=str, default="OpenCL", choices=["OpenCL", "CPU", "HIP", "Reference", "CUDA"], help="Platform to run the simulation.")
-    parser.add_argument("-s", "--steps", type=float, default=1e7, help="step size, default 1e7")
+    parser.add_argument("-s", "--steps", type=int, default=1e7, help="step size, default 1e7")
     parser.add_argument("--tempStart", type=float, default=800, help="Starting temperature")
     parser.add_argument("--tempEnd", type=float, default=200, help="Ending temperature")
     parser.add_argument("--fromCheckPoint", type=str, default=None, help="The checkpoint file you want to start from")
@@ -288,16 +223,15 @@ def main(args=None):
     parser.add_argument("--subMode", type=int, default=-1)
     parser.add_argument("-f", "--forces", default="forces_setup.py")
     parser.add_argument("--parameters", default=None)
-    parser.add_argument("-r", "--reportFrequency", type=int, default=1000, help="Frequency of timesteps measured against the reporter (record frame every N timesteps). Deprecated.")
-    parser.add_argument("-I", "--reportInterval", type=int, default=1000, help="Frequency of timesteps measured against the reporter (record frame every N timesteps). Default value: 1000")
-    parser.add_argument("--numFrames", type=int, default=-1, help="Number of frames to record. Timesteps will be 'wasted' at the end of simulation if number of timesteps is not divisible by number of frames. Default value: -1 (defer to --reportFrequency/--reportInterval)")
+    parser.add_argument("-r", "--reportInterval", "--reportFrequency", type=int, default=None, help="Number of steps between each frame recorded")
+    parser.add_argument("--numFrames", type=int, default=400, help="Number of frames to record. Can be overridden by --reportInterval")
     parser.add_argument("--fromOpenMMPDB", action="store_true", default=False)
     parser.add_argument("--fasta", type=str, default="crystal_structure.fasta")
-    parser.add_argument("--timeStep", type=int, default=2)
+    parser.add_argument("--timeStep", type=int, default=2, help="time step in femtoseconds")
     parser.add_argument("--includeLigands", action="store_true", default=False)
-    parser.add_argument('--device',default=0, help='OpenCL/CUDA device index')
+    parser.add_argument('--device', default=0, help='OpenCL/CUDA device index')
     parser.add_argument('--removeCMMotionRemover', action="store_true", default=False, help='Removes CMMotionRemover. Recommended for periodic boundary conditions and membrane simulations')
-    parser.add_argument('--dryRun',action="store_true",default=False,help="If True, quit before beginning simulation")
+    parser.add_argument('--dryRun',action="store_true",default=False,help="Return the configuration and exit without running the simulation")
     
     if args is None:
         args = parser.parse_args()
@@ -309,6 +243,46 @@ def main(args=None):
         f.write('\n')
     print(' '.join(sys.argv))
 
+    # Correct number of timesteps if negative
+    if args.steps <= 0:
+        logging.warning("--steps must be a positive integer. Reverting to default 1e7")
+        args.steps = 1e7
+
+    # Adds a deprecation warning if the deprecated option '--reportFrequency' is used
+    if '--reportFrequency' in sys.argv:
+        logging.warning("The '--reportFrequency' option is deprecated. Please use '--reportInterval' instead.", DeprecationWarning)
+
+    if args.reportInterval is None and args.numFrames>0: 
+        #Report interval is not specified and number of frames is reasonable
+        if args.numFrames > args.steps:
+            logging.warning("Number of frames --numFrames is more than number of steps. Setting number of frames to {args.steps}.")
+            args.numFrames = args.steps
+
+        args.reportInterval = math.ceil(args.steps / args.numFrames)
+        new_steps = int(args.reportInterval * args.numFrames)
+        if new_steps != args.steps:
+            logging.warning(f"Number of frames --reportInterval does not divide number of steps --steps exactly. Adjusting number of steps from {args.steps} to {new_steps}")
+        args.steps = new_steps
+    elif args.reportInterval is not None and args.reportInterval > 0: 
+        #Report interval is specified and is reasonable
+        if '--numFrames' in sys.argv:
+            logging.warning("Ignoring user-specified --numFrames. --reportInterval takes priority over --numFrames. ")
+        args.numFrames = math.ceil(args.steps / args.reportInterval)
+        new_steps = int(args.numFrames * args.reportInterval)
+        if new_steps != args.steps:
+            logging.warning(f"Number of frames --numFrames does not divide number of steps --steps exactly. Adjusting number of steps from {args.steps} to {new_steps}")
+        args.steps = new_steps
+    elif args.numFrames == 0 and args.reportInterval is None:
+        logging.info("No frames will be recorded. Simulation will run for the specified number of steps.")
+    else:
+        logging.error("Invalid values: Either --reportInterval or --numFrames must be provided with positive values.")
+        raise ValueError("Both --reportInterval and --numFrames cannot be missing or zero. Please provide valid inputs.")
+
+    if args.dryRun:
+        print("Dry run mode. Simulation will not run.")
+        print(args)
+        return args
+    
     run(args)
 
 if __name__=="__main__":

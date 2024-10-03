@@ -1,138 +1,78 @@
 import pytest
 import logging
+import openawsem.scripts.mm_run as mm_run
+import math
 
-def numFrames_reportFrequency_part_of_mm_run(args):
-    ## Configure number of timesteps and number of frames/recording interval
-    # do some basic checks on user input
-    if args.steps < 1:
-        raise ValueError("Number of timesteps --steps must be a positive integer")
+# Define parameterized test cases
+@pytest.mark.parametrize(
+    ["steps", "numFrames", "reportInterval", "should_raise", "expected_steps", "expected_frames", "expected_interval"], 
+    [
+        # Test 1: Default, numFrames = 400, steps = 1e7 -> steps / numFrames
+        (None, None, None, False, 1e7, 400, math.ceil(1e7 / 400)),
+        # Test 2: steps = 100, interval = 99, adjust steps to 198 (ceil)
+        ("100", None, "99", False, 198, 2, 99),
+        # Test 3: steps = 100, interval = 100, 1 frame recorded
+        ("100", None, "100", False, 100, 1, 100),
+        # Test 4: interval > steps (101 > 100), should adjust steps to 101
+        ("100", None, "101", False, 101, 1, 101),
+        # Test 5: steps = 100, numFrames = 99, adjust steps to match numFrames
+        ("100", "99", None, False, 198, 99, 2),
+        # Test 6: steps = 100, numFrames = 100, interval should be 1
+        ("100", "100", None, False, 100, 100, 1),
+        # Test 7: numFrames > steps (101 > 100), adjust number of frames to match steps
+        ("100", "101", None, False, 100, 100, 1),
+        # Test 8: Conflicting numFrames and interval, Interval is prefered
+        ("100", "100", "100", False, 100, 1, 100),
+        # Test 11: Interval = 1, should work, 1 frame per step
+        ("100", "100", "1", False, 100, 100, 1),
+        # Test 12: Single frame at the end, interval = 100, 1 frame
+        ("100", "1", "100", False, 100, 1, 100),
+        # Test 13: steps = 500, numFrames = 400
+        ("500", None, None, False, math.ceil(500 / 400)*400, 400, math.ceil(500 / 400)),
+        # Test 14: steps = 500, numFrames = 101, adjust steps to 505 (ceil)
+        ("500", "101", None, False, 505, 101, 5),
+        # Test 15: steps = 500, interval = 101, adjust steps to 505 (ceil)
+        ("500", None, "101", False, 505, 5, 101),
+        # Test 16: Invalid number of frames, should raise error
+        ("10", "-1", None, True, None, None, None),
+        # Test 17: steps = 0, should adjust steps to 1e7
+        ("0", None, None, False, 1e7, 400, math.ceil(1e7 / 400)),
+        # Test 18: Invalid interval, should raise error
+        ("-100", None, "-1", True, None, None, None),
+    ]
+)
+def test_numFrames_reportFrequency_handling(
+        steps, numFrames, reportInterval, should_raise, expected_steps, expected_frames, expected_interval):
+    
+    # Convert inputs to command line arguments for argparse
+    cmd_args = [
+        "test_script.py",  # Simulating script name
+        "1r69",  # PDB ID (protein name)
+        "--dryRun",  # Dry run option to return args without running the simulation
+    ]
+    
+    # Add optional arguments based on test inputs
+    if steps:
+        cmd_args.extend(["--steps", steps])
+    if numFrames:
+        cmd_args.extend(["--numFrames", numFrames])
+    if reportInterval:
+        cmd_args.extend(["--reportInterval", reportInterval])
+
+    print(f"Running with arguments: {cmd_args}")
+
+    # Test whether ValueError should be raised or not
+    if should_raise:
+        with pytest.raises(ValueError):
+            mm_run.main(cmd_args[1:])  # Skip script name
     else:
-        total_steps = args.steps
-    if args.numFrames > total_steps:
-        # the user has asked for more frames than timesteps
-        raise ValueError("Number of frames --numFrames cannot be greater than number of timesteps --steps")
-    elif args.numFrames == 0:
-        # the user has asked us to run a simulation with 0 frames
-        raise ValueError("Number of frames --numFrames cannot be zero")
-    if int(total_steps/args.reportFrequency) == 0: # int trucates so it works like the floor function for positive numbers
-        # the user has asked us to run a simulation with 0 frames
-        raise ValueError("Number of frames implied by --reportFrequency (calculated as NUM_TIMESTEPS/REPORT_FREQUENCY) must be at least 1")
-    if args.reportFrequency != -1 and args.numFrames != -1:
-        # The user has specified both --reportFrequency and --numFrames. We raise an error unless these directions are perfectly unambiguous.
-        if not (total_steps/args.reportFrequency).is_integer():
-            raise ValueError("Number of timesteps --steps is not divisible by the number of frames implied by --reportFrequency (calculated as NUM_TIMESTEPS/REPORT_FREQUENCY).")
-        elif args.numFrames != total_steps/args.reportFrequency:
-            raise ValueError("Number of frames from --numFrames and number of frames implied by --reportFrequency (calculated as NUM_TIMESTEPS/REPORT_FREQUENCY) disagree.\n\
-                             Hint: you only need to give either --reportFrequency or --numFrames on the command line, not both.") 
-    # assign number of frames, report frequency, and annealing parameters
-    if args.reportFrequency == args.numFrames == -1:
-        # the user has specified neither, so we revert to default
-        logging.warning("    Not specified: (number of frames --numFrames OR frame reporting interval --reportFrequency), therefore reverting to default of 400 frames.")
-        num_frames = 400
-        if total_steps < 400:
-            raise ValueError("Number of frames cannot be greater than number of timesteps --steps")
-        if not (total_steps / num_frames).is_integer():
-            logging.warning(f"    Number of timesteps --steps is not divisible by the number of frames. Increasing number of timesteps so that the simulation ends with a complete frame.")
-            # we are not allowed to override the number of frames
-            # so we need to increase the value of total_steps such that is it an integer multiple of 
-            # (because we can't have a fractional reporting frequency)
-            # we do this by round total_steps/num_frames up to the nearest integer, then multiplying by num_frames
-            total_steps = (int(total_steps/num_frames)+1) * num_frames
-        reporter_frequency = total_steps / num_frames
-    elif args.numFrames != -1:
-        # the user has specified --numFrames
-        # if the user also specified --reportFrequency, then report frequency agrees with --numFrames (due to above check)
-        num_frames = args.numFrames
-        if not (total_steps / num_frames).is_integer():
-            logging.warning(f"    Number of timesteps --steps is not divisible by the number of frames. Increasing number of timesteps so that the simulation ends with a complete frame.")
-            # we are not allowed to override the number of frames
-            # so we need to increase the value of total_steps such that it is an integer multiple of num_frames
-            # (because we can't have a fractional reporting frequency)
-            # we do this by rounding total_steps/num_frames up to the nearest integer, then multiplying by num_frames
-            total_steps = (int(total_steps/num_frames)+1) * num_frames
-        reporter_frequency = total_steps / num_frames
-    elif args.reportFrequency != -1:
-        # the user has specified --reportFrequency but not --numFrames
-        reporter_frequency = args.reportFrequency
-        if not (total_steps/reporter_frequency).is_integer():
-            logging.warning(f"    Number of timesteps --steps is not divisible by the recording interval. Increasing number of timesteps so that the simulation ends with a complete frame.")
-            # we are not allowed to override the reporting interval
-            # so we need to increase the value of total_steps such that it is an integer multiple of reporter_frequency
-            # (because we can't have a fractional number of frames)
-            # we do this by rounding total_steps/reporter_frequency up to the nearest integer, then multiplying by reporter_frequency
-            total_steps = (int(total_steps/reporter_frequency)+1) * reporter_frequency
-        num_frames = total_steps / reporter_frequency
-    else:
-        raise AssertionError(f"Logical error in if-elif-elif, which should catch every case. frame: {args.numFrames}, frequency: {args.reportFrequency}")
-    Tstart = args.tempStart
-    Tend = args.tempEnd
-    # make sure everything aggrees
-    assert reporter_frequency * num_frames == total_steps, f"reporter_frequency: {reporter_frequency}, num_frames: {num_frames}, total_steps: {total_steps}"
-    assert reporter_frequency.is_integer(), f"reporter_frequency: {reporter_frequency}, num_frames: {num_frames}, total_steps: {total_steps}"
-    assert num_frames.is_integer(), f"reporter_frequency: {reporter_frequency}, num_frames: {num_frames}, total_steps: {total_steps}"
-    reporter_frequency = int(reporter_frequency) # openmm functions want input type to be integer, not just integer-valued float
-    num_frames = int(num_frames) # openmm functions want input type to be integer, not just integer-valued float
-    total_steps = int(total_steps) # openmm functions want input type to be integer, not just integer-valued float
+        # Run mm_run.main and capture returned args in dry run mode
+        result = mm_run.main(cmd_args[1:])  # Passing the argument list without script name
 
-def test_numFrames_reportFrequency_handling():
-    class Args:
-        def __init__(self,arg_list):
-            self.steps = arg_list[0]
-            self.numFrames = arg_list[1]
-            self.reportFrequency = arg_list[2]
-            self.tempStart = 0 # don't care about this for test
-            self.tempEnd = 0 # don't care about this for test
-
-    args = Args([100,-1,-1]) # numFrames will default to 400, so we won't have enough timesteps
-    with pytest.raises(ValueError):
-        numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([100,-1,99]) # this should work
-    numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([100,-1,100]) # this should work
-    numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([100,-1,101]) # this shouldn't work because we won't have a single timestep
-    with pytest.raises(ValueError):
-        numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([100,99,-1]) # this should work
-    numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([100,100,-1]) # this should work
-    numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([100,101,-1]) # this shouldn't work because we won't have a single timestep
-    with pytest.raises(ValueError):
-        numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([100,100,100]) # this shouldn't work because the given report interval and number of frames disagree
-    with pytest.raises(ValueError):
-        numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([100,10,11]) # this shouldn't work because the given report interval and number of frames disagree
-    with pytest.raises(ValueError):
-        numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([100,10,9]) # this shouldn't work because the given report interval and number of frames disagree
-    with pytest.raises(ValueError):
-        numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([100,100,1]) # this should work
-    numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([100,1,100]) # this should work
-    numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([500,-1,-1]) # this should work
-    numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([500,101,-1]) # this should work
-    numFrames_reportFrequency_part_of_mm_run(args)
-
-    args = Args([500,-1,101]) # this should work
-    numFrames_reportFrequency_part_of_mm_run(args)
+        # Validate the returned values against expected values
+        assert result.steps == expected_steps, f"Expected steps: {expected_steps}, but got: {result.steps}"
+        assert result.numFrames == expected_frames, f"Expected frames: {expected_frames}, but got: {result.numFrames}"
+        assert result.reportInterval == expected_interval, f"Expected interval: {expected_interval}, but got: {result.reportInterval}"
 
 if __name__ == "__main__":
     test_numFrames_reportFrequency_handling()
