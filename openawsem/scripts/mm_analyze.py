@@ -82,7 +82,6 @@ def analyze(args):
     # pdb_trajectory = read_trajectory_pdb_positions(trajectoryPath)
 
 
-
     oa = OpenMMAWSEMSystem(input_pdb_filename, chains=chain, k_awsem=1.0, xml_filename=openawsem.xml, seqFromPdb=seq, includeLigands=args.includeLigands)  # k_awsem is an overall scaling factor that will affect the relevant temperature scales
 
     print(f"using force setup file from {forceSetupFile}")
@@ -175,7 +174,7 @@ def main(args=None):
     parser.add_argument("--thread", type=int, default=2, help="default is using 2 CPUs, -1 is using all")
     parser.add_argument("-p", "--platform", type=str, default="CPU", help="Could be OpenCL, CUDA and CPU")
     parser.add_argument("-t", "--trajectory", type=str, default="./movie.pdb")
-    parser.add_argument("-o", "--output", type=str, default=None, help="The Name of file that show your energy and Q infomation.")
+    parser.add_argument("-o", "--output", type=str, default=None, help="The Name of file that shows your energy and Q information.")
     parser.add_argument("--subMode", type=int, default=3)
     parser.add_argument("-f", "--forces", default="forces_setup.py")
     parser.add_argument("--parameters", default=None)
