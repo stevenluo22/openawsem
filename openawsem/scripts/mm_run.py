@@ -205,7 +205,7 @@ def run(args):
 def main(args=None):
     parser = argparse.ArgumentParser(
         description="This is a python3 script to automatically copy the template file and run simulations")
-
+    # default=False with action="store_true" is redundant but doesn't hurt us
     parser.add_argument("protein", help="The name of the protein")
     parser.add_argument("--name", default="simulation", help="Name of the simulation")
     parser.add_argument("--to", default="./", help="location of movie file")
@@ -232,7 +232,7 @@ def main(args=None):
     parser.add_argument('--device', default=0, help='OpenCL/CUDA device index')
     parser.add_argument('--removeCMMotionRemover', action="store_true", default=False, help='Removes CMMotionRemover. Recommended for periodic boundary conditions and membrane simulations')
     parser.add_argument('--dryRun',action="store_true",default=False,help="Return the configuration and exit without running the simulation")
-    
+
     if args is None:
         args = parser.parse_args()
     else:
