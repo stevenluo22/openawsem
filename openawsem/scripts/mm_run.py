@@ -75,9 +75,6 @@ def run(args):
         print(f"Using Seq:\n{seq}")
     # start simulation
     collision_rate = 5.0 / picoseconds
-    checkpoint_file = "checkpnt.chk"
-    checkpoint_reporter_frequency = 10000
-
 
     # assign annealing parameters
     Tstart = args.tempStart
@@ -139,7 +136,7 @@ def run(args):
     simulation.reporters.append(DCDReporter(os.path.join(toPath, "movie.dcd"), reportInterval=args.reportInterval, append=True))  # output PDBs of simulated structures
     # simulation.reporters.append(DCDReporter(os.path.join(args.to, "movie.dcd"), 1))  # output PDBs of simulated structures
     # simulation.reporters.append(PDBReporter(os.path.join(args.to, "movie.pdb"), 1))  # output PDBs of simulated structures
-    simulation.reporters.append(CheckpointReporter(os.path.join(toPath, checkpoint_file), checkpoint_reporter_frequency))  # save progress during the simulation
+    simulation.reporters.append(CheckpointReporter(os.path.join(toPath, args.checkpointFile), args.checkpointInterval))  # save progress during the simulation
 
     if args.dryRun:
         if args.simulation_mode == 1: # test temperature setting
@@ -223,7 +220,9 @@ def main(args=None):
     parser.add_argument("--subMode", type=int, default=-1)
     parser.add_argument("-f", "--forces", default="forces_setup.py")
     parser.add_argument("--parameters", default=None)
-    parser.add_argument("-r", "--reportInterval", "--reportFrequency", type=int, default=None, help="Number of steps between each frame recorded")
+    parser.add_argument("-r", "--reportInterval", "--reportFrequency", type=float, default=None, help="Number of steps between each frame recorded")
+    parser.add_argument("--checkpointInterval", type=float, default=None, help="Number of steps between each frame recorded")
+    parser.add_argument("--checkpointFile", type=str, default="checkpoint.chk", help="Name of the checkpoint file")
     parser.add_argument("--numFrames", type=int, default=400, help="Number of frames to record. Can be overridden by --reportInterval")
     parser.add_argument("--fromOpenMMPDB", action="store_true", default=False)
     parser.add_argument("--fasta", type=str, default="crystal_structure.fasta")
@@ -280,6 +279,9 @@ def main(args=None):
     else:
         logging.error("Invalid values: Either --reportInterval or --numFrames must be provided with positive values.")
         raise ValueError("Both --reportInterval and --numFrames cannot be missing or zero. Please provide valid inputs.")
+
+    args.reportInterval = int(args.reportInterval)
+    args.checkpointInterval = args.reportInterval if args.checkpointInterval is None else int(args.checkpointInterval)
 
     if args.dryRun:
         print("Dry run mode. Simulation will not run.")
