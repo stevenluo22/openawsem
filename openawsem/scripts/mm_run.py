@@ -212,7 +212,7 @@ def main(args=None):
     parser.add_argument("-c", "--chain", type=str, default="-1")
     parser.add_argument("-t", "--thread", type=int, default=-1, help="default is using all that is available")
     parser.add_argument("-p", "--platform", type=str, default="OpenCL", choices=["OpenCL", "CPU", "HIP", "Reference", "CUDA"], help="Platform to run the simulation.")
-    parser.add_argument("-s", "--steps", type=int, default=1e7, help="step size, default 1e7")
+    parser.add_argument("-s", "--steps", type=float, default=1e7, help="step size, default 1e7")
     parser.add_argument("--tempStart", type=float, default=800, help="Starting temperature")
     parser.add_argument("--tempEnd", type=float, default=200, help="Ending temperature")
     parser.add_argument("--fromCheckPoint", type=str, default=None, help="The checkpoint file you want to start from")
@@ -247,6 +247,9 @@ def main(args=None):
     if args.steps <= 0:
         logging.warning("--steps must be a positive integer. Reverting to default 1e7")
         args.steps = 1e7
+    else:
+        # Convert steps to integer
+        args.steps = int(args.steps)
 
     # Adds a deprecation warning if the deprecated option '--reportFrequency' is used
     if '--reportFrequency' in sys.argv:
