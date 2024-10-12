@@ -312,7 +312,7 @@ class AWSEMSimulationProject:
             out.write("[Target]\nquery\n\n[Memories]\n")
             for (chain_name, chain_start_residue_index, seq_length) in seq_data:
                 # print(f"write chain {chain_name}")
-                out.write(f"{self.name}_{chain_name}.gro {chain_start_residue_index} 1 {seq_length} 20\n")   # residue index in Gro always start at 1.
+                out.write(f"{self.name}_{chain_name}.gro 1 {chain_start_residue_index} {seq_length} 20\n")   # single_memory is always read starting from 1.
 
     def generate_charges(self):
         logging.info("Generating charges")

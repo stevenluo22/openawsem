@@ -583,14 +583,28 @@ def seq_length_from_pdb(fileLocation, chains):
     data = []
     parser = PDBParser()
     structure = parser.get_structure('X', fileLocation)
-    chain_start_residue_index = 1
     for c in structure.get_chains():
         chain_name = c.get_id()
         if chain_name in chains:
-            seq_len = len(list(c.get_residues()))
-            logging.info(f"Chain {chain_name}: Sequence length {seq_len}")
-            data.append((chain_name, chain_start_residue_index, seq_len))
-            chain_start_residue_index += seq_len
+            residues = list(c.get_residues())
+            
+            #Get the regions of the pdb that are not missing residues           
+            contiguous_regions = []
+            current_region = [residues[0]]
+            for i in range(1, len(residues)):
+                if residues[i].get_id()[1] == residues[i-1].get_id()[1] + 1:
+                    current_region.append(residues[i])
+                else:
+                    contiguous_regions.append(current_region)
+                    current_region = [residues[i]]
+            contiguous_regions.append(current_region)
+            
+            #Add a fragment for every contiguous sequence
+            for sequence in contiguous_regions:
+                seq_len = len(sequence)
+                chain_start_residue_index = sequence[0].get_id()[1]  # Set to first residue's number
+                logging.info(f"Chain {chain_name}: Sequence length {seq_len}")
+                data.append((chain_name, chain_start_residue_index, seq_len))
     return data
 
 
