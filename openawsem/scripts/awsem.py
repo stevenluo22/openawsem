@@ -14,6 +14,8 @@ def main():
     #parser.add_argument_group("Helper", "Useful functions for AWSEM")
     subparsers.add_parser('pdb2gro', help='Converts a pdb file to a gro file', add_help=False,)
     subparsers.add_parser('align_fragments', help='Aligns fragments to a fasta file', add_help=False)
+    subparsers.add_parser('fix_aminoacids', help='Fixes the aminoacids from a movie or native', add_help=False)
+
 
     args, remaining_args = parser.parse_known_args()
     if len(remaining_args)==0:
@@ -23,6 +25,7 @@ def main():
     sys.argv[0] = f"{original_argv[0]} {args.subcommand}"
 
     print(sys.argv)
+
     if args.subcommand == 'create':
         from openawsem.scripts import mm_create_project
         mm_create_project.main(remaining_args)
@@ -35,6 +38,10 @@ def main():
     elif args.subcommand == 'pdb2gro':
         from openawsem.helperFunctions import Pdb2Gro
         Pdb2Gro.main(remaining_args)
+    elif args.subcommand == 'fix_aminoacids':
+        from openawsem.helperFunctions import convertOpenmmTrajectoryToStandardMovie
+        print(remaining_args)
+        convertOpenmmTrajectoryToStandardMovie.main(remaining_args)
     elif args.subcommand == 'align_fragments':
         from openawsem.helperFunctions import align_fragments
         align_fragments.main(remaining_args)
