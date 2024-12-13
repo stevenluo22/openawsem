@@ -55,7 +55,7 @@ def read_reference_structure_for_q_calculation_3(oa, pdb_file, reference_chain_n
                     structure_interaction = [i_index, j_index, [gamma_ij, r_ijN, sigma_ij]]
                     structure_interactions.append(structure_interaction)
     # print("Done reading")
-    print(structure_interactions)
+    # print(structure_interactions)
     return structure_interactions
 
 def read_reference_structure_for_qc_calculation(oa, pdb_file, min_seq_sep=3, a=0.1, startResidueIndex=0, endResidueIndex=-1, residueIndexGroup=None):
@@ -291,7 +291,7 @@ def partial_rg_term(oa, startResidueIndex=0, endResidueIndex=-1, residueIndexGro
     rg.setForceGroup(2)
     return rg
 
-def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0*nanometer, atomGroup=-1, forceGroup=11):  #rg0 should be in nanometers.
+def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0*nanometer, atomGroup=-1, forceGroup=5):  #rg0 should be in nanometers.
     k = k.value_in_unit(kilojoule_per_mole)   # convert to kilojoule_per_mole, openMM default uses kilojoule_per_mole as energy.
     rg0 = rg0.value_in_unit(nanometer)
     k_rg = oa.k_awsem * k
@@ -316,7 +316,7 @@ def rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0*nanometer, atomGroup=-1, fo
     return rg
 
 # Implement Wu's Rg term into OpenAWSEM. See Wu, J. Phys. Chem. B, 2018, 11115-11125.
-def IDP_term(oa, rg0=0*angstrom, D=-0.5*kilocalorie_per_mole, alpha=0.001*kilocalorie_per_mole/angstrom**2, beta=0.001/angstrom**4, gamma=1.1, atomGroup=-1, forceGroup=11):
+def Wu_Rg_term(oa, rg0=0*angstrom, D=-0.5*kilocalorie_per_mole, alpha=0.001*kilocalorie_per_mole/angstrom**2, beta=0.001/angstrom**4, gamma=1.1, atomGroup=-1, forceGroup=5):
     D = D.value_in_unit(kilojoule_per_mole)
     rg0 = rg0.value_in_unit(angstrom)
     alpha = alpha.value_in_unit(kilojoule_per_mole/angstrom**2)
@@ -337,11 +337,11 @@ def IDP_term(oa, rg0=0*angstrom, D=-0.5*kilocalorie_per_mole, alpha=0.001*kiloca
     print(f"({D}*{n}+{alpha}*(rg_square^0.5-{gamma}*{rg0})^2)/(1+{beta}*(rg_square^0.5-{rg0})^4)")
     Vrg = CustomCVForce(f"({D}*{n}+{alpha}*(rg_square^0.5-{gamma}*{rg0})^2)/(1+{beta}*(rg_square^0.5-{rg0})^4)")
     Vrg.addCollectiveVariable("rg_square", rg_square)
-    Vrg.setForceGroup(27)
+    Vrg.setForceGroup(forceGroup)
     return Vrg
 
 
-def cylindrical_rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, forceGroup=11):
+def cylindrical_rg_bias_term(oa, k=1*kilocalorie_per_mole, rg0=0, atomGroup=-1, forceGroup=5):
     k = k.value_in_unit(kilojoule_per_mole)   # convert to kilojoule_per_mole, openMM default uses kilojoule_per_mole as energy.
     k_rg = oa.k_awsem * k
     nres, ca = oa.nres, oa.ca
