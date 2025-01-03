@@ -82,7 +82,6 @@ def analyze(args):
     # pdb_trajectory = read_trajectory_pdb_positions(trajectoryPath)
 
 
-
     oa = OpenMMAWSEMSystem(input_pdb_filename, chains=chain, k_awsem=1.0, xml_filename=openawsem.xml, seqFromPdb=seq, includeLigands=args.includeLigands)  # k_awsem is an overall scaling factor that will affect the relevant temperature scales
 
     print(f"using force setup file from {forceSetupFile}")
@@ -120,7 +119,7 @@ def analyze(args):
     # forceGroupTable = {"Con":11, "Chain":12, "Chi":13, "Excluded":14, "Rama":15, "Direct":16,
     #                    "Burial":17, "Mediated":18, "Contact":18, "Fragment":19, "Membrane":20, "ER":21,"TBM_Q":22, "beta_1":23, "Total":list(range(11, 26)),
     #                    "Water":[16, 18], "beta":[23, 24, 25], "Q":1}
-    showValue = ["Q", "Rg"]
+    showValue = ["Q", "Qc", "Rg"]
     # term in showEnergy will assume to take on the energy unit of kilojoule_per_mole, it will be shown in unit of kilocalories_per_mole(divided by 4.184) 
     # term in showValue will not be converted.
     showEnergy = ["Backbone", "Rama", "Contact", "Fragment", "Membrane", "ER", "TBM_Q", "Beta", "Pap", "Helical", "Debye_huckel","Total"]
@@ -175,7 +174,7 @@ def main(args=None):
     parser.add_argument("--thread", type=int, default=2, help="default is using 2 CPUs, -1 is using all")
     parser.add_argument("-p", "--platform", type=str, default="CPU", help="Could be OpenCL, CUDA and CPU")
     parser.add_argument("-t", "--trajectory", type=str, default="./movie.pdb")
-    parser.add_argument("-o", "--output", type=str, default=None, help="The Name of file that show your energy and Q infomation.")
+    parser.add_argument("-o", "--output", type=str, default=None, help="The Name of file that shows your energy and Q information.")
     parser.add_argument("--subMode", type=int, default=3)
     parser.add_argument("-f", "--forces", default="forces_setup.py")
     parser.add_argument("--parameters", default=None)

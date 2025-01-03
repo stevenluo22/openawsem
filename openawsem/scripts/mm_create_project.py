@@ -271,7 +271,7 @@ class AWSEMSimulationProject:
 
         openawsem.helperFunctions.create_zim(f"crystal_structure.fasta", tableLocation=__location__/"helperFunctions")
 
-    def generate_fragment_memory(self,database = "cullpdb_pc80_res3.0_R1.0_d160504_chains29712",fasta = None,N_mem = 20,brain_damage = 1.0,fragmentLength = 9,cutoff_identical=90):
+    def generate_fragment_memory(self,database = "cullpdb_pc80_res3.0_R1.0_d160504_chains29712",fasta = None,N_mem = 20,brain_damage = 1.0,fragmentLength = 10,cutoff_identical=90):
         """
         Generate the fragment memory file if the frag option is specified.
         """
@@ -312,7 +312,7 @@ class AWSEMSimulationProject:
             out.write("[Target]\nquery\n\n[Memories]\n")
             for (chain_name, chain_start_residue_index, seq_length) in seq_data:
                 # print(f"write chain {chain_name}")
-                out.write(f"{self.name}_{chain_name}.gro {chain_start_residue_index} 1 {seq_length} 20\n")   # residue index in Gro always start at 1.
+                out.write(f"{self.name}_{chain_name}.gro 1 {chain_start_residue_index} {seq_length} 20\n")   # single_memory is always read starting from 1.
 
     def generate_charges(self):
         logging.info("Generating charges")
@@ -500,7 +500,7 @@ def main(args=None):
     frag_parser.add_argument("--frag_fasta", default=None, help="Provide the FASTA file for fragment generation.")
     frag_parser.add_argument("--frag_N_mem", type=int, default=20, help="Number of memories to generate per fragment.")
     frag_parser.add_argument("--frag_brain_damage", type=float, choices=[0, 0.5, 1, 2], default=0, help="Control the inclusion or exclusion of homologous protein structures for generating fragment memories.\n 0: Homologs allowed; include all hits\n 0.5: Self-only; Include only homologs with >90%% similarity\n 1: Homologs excluded; Exclude all homologs (any similarity percent)\n 2: Homologs only; Include only homologous structures (except >90%% similarity)")
-    frag_parser.add_argument("--frag_fragmentLength", type=int, default=9, help="Length of the fragments to be generated.")
+    frag_parser.add_argument("--frag_fragmentLength", type=int, default=10, help="Length of the fragments to be generated.")
     frag_parser.add_argument("--frag_cutoff_identical", type=int, default=90, help="Identity cutoff for self-structures")
 
 
