@@ -310,9 +310,11 @@ class AWSEMSimulationProject:
         seq_data = openawsem.helperFunctions.seq_length_from_pdb("crystal_structure-cleaned.pdb", self.chain)
         with open("single_frags.mem", "w") as out:
             out.write("[Target]\nquery\n\n[Memories]\n")
+            chain_index_start = 1
             for (chain_name, chain_start_residue_index, seq_length) in seq_data:
                 # print(f"write chain {chain_name}")
-                out.write(f"{self.name}_{chain_name}.gro 1 {chain_start_residue_index} {seq_length} 20\n")   # single_memory is always read starting from 1.
+                out.write(f"{self.name}_{chain_name}.gro {chain_index_start} {chain_start_residue_index} {seq_length} 20\n")   # single_memory is always read starting from 1.
+                chain_index_start += seq_length
 
     def generate_charges(self):
         logging.info("Generating charges")
