@@ -337,8 +337,10 @@ class AWSEMSimulationProject:
         Copy required scripts and files to the current working directory.
         """
         logging.info(f"Copying scripts to {destination_folder}")
-        mm_run_path = __location__ /"scripts"/ "mm_run.py"
-        mm_analysis_path = __location__ /"scripts"/ "mm_analyze.py"
+        #mm_run_path = __location__ /"scripts"/ "mm_run.py"
+        mm_run_path = __location__ /"scripts"/ "mm_run_custom_memory.py"
+        #mm_analysis_path = __location__ /"scripts"/ "mm_analyze.py"
+        mm_analysis_path = __location__ /"scripts"/ "mm_analyze_custom_memory.py"
         forces_setup_path = __location__ /"scripts"/ "forces_setup.py"
 
         shutil.copy(mm_run_path, destination_folder)
@@ -495,6 +497,7 @@ def main(args=None):
     parser.add_argument("--keepLigands", action="store_true", default=False, help="Preserve ligands in the protein structure.")
     parser.add_argument("--to", default=None, help="Folder to create the project in. Default is the name of the protein")
     parser.add_argument("--test", action="store_true", default=False, help="Tests the current module")
+    parser.add_argument("--memory", default=False, help="Allows customization of memory terms")
 
       # Create a subparser for frag-related arguments
     frag_parser = parser.add_argument_group("frag", "Arguments for fragment memory generation. Only used if --frag is specified")
