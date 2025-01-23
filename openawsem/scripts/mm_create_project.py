@@ -338,9 +338,14 @@ class AWSEMSimulationProject:
         """
         logging.info(f"Copying scripts to {destination_folder}")
         #mm_run_path = __location__ /"scripts"/ "mm_run.py"
-        mm_run_path = __location__ /"scripts"/ "mm_run_custom_memory.py"
         #mm_analysis_path = __location__ /"scripts"/ "mm_analyze.py"
-        mm_analysis_path = __location__ /"scripts"/ "mm_analyze_custom_memory.py"
+        if self.args.customMemory:
+            mm_run_path = __location__ /"scripts"/ "mm_run_custom_memory.py"
+            mm_analysis_path = __location__ /"scripts"/ "mm_analyze_custom_memory.py"
+        else:
+            mm_run_path = __location__ /"scripts"/ "mm_run.py"
+            mm_analysis_path = __location__ /"scripts"/ "mm_analyze.py"
+
         forces_setup_path = __location__ /"scripts"/ "forces_setup.py"
 
         shutil.copy(mm_run_path, destination_folder)
@@ -497,7 +502,7 @@ def main(args=None):
     parser.add_argument("--keepLigands", action="store_true", default=False, help="Preserve ligands in the protein structure.")
     parser.add_argument("--to", default=None, help="Folder to create the project in. Default is the name of the protein")
     parser.add_argument("--test", action="store_true", default=False, help="Tests the current module")
-    parser.add_argument("--memory", default=False, help="Allows customization of memory terms")
+    parser.add_argument("--customMemory", action="store_true", default=False, help="Allows customization of memory terms")
 
       # Create a subparser for frag-related arguments
     frag_parser = parser.add_argument_group("frag", "Arguments for fragment memory generation. Only used if --frag is specified")
@@ -507,7 +512,6 @@ def main(args=None):
     frag_parser.add_argument("--frag_brain_damage", type=float, choices=[0, 0.5, 1, 2], default=0, help="Control the inclusion or exclusion of homologous protein structures for generating fragment memories.\n 0: Homologs allowed; include all hits\n 0.5: Self-only; Include only homologs with >90%% similarity\n 1: Homologs excluded; Exclude all homologs (any similarity percent)\n 2: Homologs only; Include only homologous structures (except >90%% similarity)")
     frag_parser.add_argument("--frag_fragmentLength", type=int, default=10, help="Length of the fragments to be generated.")
     frag_parser.add_argument("--frag_cutoff_identical", type=int, default=90, help="Identity cutoff for self-structures")
-
 
     # Parse and return the command-line arguments
     if args is None:
