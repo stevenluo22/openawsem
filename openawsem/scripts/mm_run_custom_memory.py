@@ -233,7 +233,7 @@ def main(args=None):
     parser.add_argument('--dryRun',action="store_true",default=False,help="Return the configuration and exit without running the simulation")
     parser.add_argument('--memory', type=str, default="frags.mem", help="memory terms file")
     parser.add_argument('--memoryStrength', type=float, default=1, help="associative memory strength")
-    parser.add_argument('--memoryOnly', type=bool, default=False, help="turn off non-memory terms or not")
+    parser.add_argument('--memoryOnly', action="store_true", type=bool, default=False, help="turn off non-memory terms or not")
 
     if args is None:
         args = parser.parse_args()
