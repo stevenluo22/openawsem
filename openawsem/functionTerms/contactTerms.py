@@ -1483,7 +1483,9 @@ def contact_term_shift_well_center(oa, k_contact=4.184, z_dependent=False, z_m=1
     contact.setForceGroup(forceGroup)
     return contact
 
-def burial_term(oa, k_burial=4.184, fastaFile="FastaFileMissing"):
+def burial_term(oa, k_burial=4.184, periodic=False, parametersLocation=None, burialGammaName="burial_gamma.dat", forceGroup=17):
+    if parametersLocation is None:
+        parametersLocation=openawsem.data_path.parameters
     k_burial *= oa.k_awsem
     burial_kappa = 4.0
     burial_ro_min = [0.0, 3.0, 6.0]
@@ -1492,7 +1494,7 @@ def burial_term(oa, k_burial=4.184, fastaFile="FastaFileMissing"):
     eta = 50  # eta actually has unit of nm^-1.
     r_min = .45
     r_max = .65
-    burial_gamma = np.loadtxt("burial_gamma.dat")
+    burial_gamma = np.loadtxt(os.path.join(parametersLocation, burialGammaName))
 
     # return burial
     # if ( lc->chain_no[i]!=lc->chain_no[j] || abs(lc->res_no[j] - lc->res_no[i])>1 )
@@ -1539,7 +1541,14 @@ def burial_term(oa, k_burial=4.184, fastaFile="FastaFileMissing"):
         for e2 in cb_fixed:
             burial.addExclusion(e1, e2)
 
-    burial.setForceGroup(17)
+    if periodic:
+        burial.setNonbondedMethod(burial.CutoffPeriodic)
+        print('\ncontact_term is periodic')
+    else:
+        burial.setNonbondedMethod(burial.CutoffNonPeriodic)
+    print("Burial cutoff ", burial.getCutoffDistance())
+    print("NonbondedMethod: ", burial.getNonbondedMethod())
+    burial.setForceGroup(forceGroup)
     return burial
 
 '''

@@ -100,7 +100,7 @@ def analyze(args):
     simulation = Simulation(oa.pdb.topology, oa.system, integrator, platform)
 
     # apply forces
-    forceGroupTable = {"Backbone":20, "Rama":21, "Contact":22, "Fragment":23, "Membrane":24, "ER":25, "TBM_Q":26, "Beta":27, "Pap":28, "Helical":29,
+    forceGroupTable = {"Backbone":20, "Rama":21, "Contact":22, "Burial":17, "Fragment":23, "Membrane":24, "ER":25, "TBM_Q":26, "Beta":27, "Pap":28, "Helical":29,
                         "Q":1, "Rg":2, "Qc":3,
                         "Helix_orientation":18, "Pulling":19, "Debye_huckel":30,
                         "Total":list(range(11, 32))
@@ -122,7 +122,7 @@ def analyze(args):
     showValue = ["Q", "Qc", "Rg"]
     # term in showEnergy will assume to take on the energy unit of kilojoule_per_mole, it will be shown in unit of kilocalories_per_mole(divided by 4.184) 
     # term in showValue will not be converted.
-    showEnergy = ["Backbone", "Rama", "Contact", "Fragment", "Membrane", "ER", "TBM_Q", "Beta", "Pap", "Helical", "Debye_huckel","Total"]
+    showEnergy = ["Backbone", "Rama", "Contact", "Burial", "Fragment", "Membrane", "ER", "TBM_Q", "Beta", "Pap", "Helical", "Debye_huckel","Total"]
     showAll = showValue + showEnergy
     # , "Disulfide"
     # showEnergy = ["Q", "Qc", "Rg", "Con", "Chain", "Chi", "Excluded", "Rama", "Contact", "Helical", "Fragment", "Membrane", "ER", "Beta", "Pap", "Total"]
