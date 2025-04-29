@@ -69,12 +69,11 @@ def tbm_q_term(oa, k_tbm_q, rnative_dat="rnative.dat", tbm_q_min_seq_sep=3, tbm_
 
 
 def fragment_memory_term(oa, k_fm=0.04184, frag_file_list_file="./frag.mem", npy_frag_table="./frag_table.npy",
-                    min_seq_sep=3, max_seq_sep=9, fm_well_width=0.1, UseSavedFragTable=True, caOnly=False, forceGroup=23):
+                    min_seq_sep=3, max_seq_sep=9, fm_well_width=0.1, frag_table_dr = 0.001, UseSavedFragTable=True, caOnly=False, forceGroup=23):
     # 0.8368 = 0.01 * 4.184 # in kJ/mol, converted from default value in LAMMPS AWSEM
     k_fm *= oa.k_awsem
     frag_table_rmin = 0
     frag_table_rmax = 5  # in nm
-    frag_table_dr = 0.01
     r_array = np.arange(frag_table_rmin, frag_table_rmax, frag_table_dr)
     number_of_atoms = oa.natoms
     r_table_size = int((frag_table_rmax - frag_table_rmin)/frag_table_dr)  # 500 here.

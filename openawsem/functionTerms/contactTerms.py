@@ -40,7 +40,7 @@ def inWhichChain(residueId, chain_ends):
             return chain_table[i]
 
 
-def contact_term(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0*angstrom, k_relative_mem=1.0, periodic=False, parametersLocation=None, burialPartOn=True, withExclusion=False, forceGroup=22,
+def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0*angstrom, k_relative_mem=1.0, periodic=False, parametersLocation=None, burialPartOn=True, withExclusion=False, forceGroup=22,
                 gammaName="gamma.dat", burialGammaName="burial_gamma.dat", membraneGammaName="membrane_gamma.dat", r_min=0.45,min_sequence_separation=10,min_sequence_separation_mem=10):
     if parametersLocation is None:
         parametersLocation=openawsem.data_path.parameters
@@ -51,6 +51,16 @@ def contact_term(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMembrane=Fal
         k_contact = k_contact * oa.k_awsem
     else:
         print(f"Unknown input, {k_contact}, {type(k_contact)}")
+    #setting burial
+    if k_burial == None:
+        k_burial = k_contact
+    elif isinstance(k_burial, float) or isinstance(k_burial, int):
+        k_burial = k_burial * oa.k_awsem   # just for backward comptable
+    elif isinstance(k_burial, Quantity):
+        k_burial = k_burial.value_in_unit(kilojoule_per_mole)   # convert to kilojoule_per_mole, openMM default uses kilojoule_per_mole as energy.
+        k_burial = k_burial * oa.k_awsem
+    else:
+        print(f"Unknown input, {k_burial}, {type(k_burial)}")
     # combine direct, burial, mediated.
     # default membrane thickness 1.5 nm
     membrane_center = membrane_center.value_in_unit(nanometer)   # convert to nm
@@ -253,7 +263,7 @@ def contact_term(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMembrane=Fal
             contact.addGlobalParameter(f"rho_min_{i}", burial_ro_min[i])
             contact.addGlobalParameter(f"rho_max_{i}", burial_ro_max[i])
         for i in range(3):
-            contact.addEnergyTerm(f"-0.5*isCb*{k_contact}*burial_gamma_ij(resName, {i})*\
+            contact.addEnergyTerm(f"-0.5*isCb*{k_burial}*burial_gamma_ij(resName, {i})*\
                                         (tanh({burial_kappa}*(rho-rho_min_{i}))+\
                                         tanh({burial_kappa}*(rho_max_{i}-rho)))", CustomGBForce.SingleParticle)
 
