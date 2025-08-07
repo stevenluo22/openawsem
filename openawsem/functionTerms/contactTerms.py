@@ -40,8 +40,44 @@ def inWhichChain(residueId, chain_ends):
             return chain_table[i]
 
 
-def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0*angstrom, k_relative_mem=1.0, periodic=False, parametersLocation=None, directPartOn=True, mediatedPartOn=True, burialPartOn=True, withExclusion=False, forceGroup=22,
-                gammaName="gamma.dat", burialGammaName="burial_gamma.dat", membraneGammaName="membrane_gamma.dat", r_min=0.45,min_sequence_separation=10,min_sequence_separation_mem=10):
+def inSameChain(i,j,chain_starts,chain_ends):
+    # determine whether residues are in the same chain
+    #
+    # sometimes, one of the residues might not exist
+    # we'll treat not existing as being part of a different chain
+    # but it shouldn't really affect anything
+    if i<0 or j<0:
+        if i<0 and j<0:
+            raise AssertionError(f"Residues i and j do not exist! i: {i}, j: {j}")
+        else:
+            return False
+    if i>chain_ends[-1] or j>chain_ends[-1]:
+        if i>chain_ends[-1] and j>chain_ends[-1]:
+            raise AssertionError(f"Residues i and j do not exist! i: {i}, j: {j}")
+        else:
+            return False
+    # if we've made it this far, we know that both residues exist
+    wombat = [int(chain_start<=i and i<=chain_end) for chain_start,chain_end in zip(chain_starts,chain_ends)]
+    assert sum(wombat) == 1, f"i: {i}, chain_starts: {chain_starts}, chain_ends: {chain_ends}, list: {wombat}"
+    chain_index_1 = wombat.index(1)
+    wombat = [int(chain_start<=j and j<=chain_end) for chain_start,chain_end in zip(chain_starts,chain_ends)]
+    assert sum(wombat) == 1, f"j: {j}, chain_starts: {chain_starts}, chain_ends: {chain_ends}, list: {wombat}"
+    chain_index_2 = wombat.index(1)
+    same_chain = chain_index_1==chain_index_2
+    return same_chain
+
+
+def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0*angstrom, k_relative_mem=1.0, parametersLocation=None, burialPartOn=True, withExclusion=False, forceGroup=22,
+                gammaName="gamma.dat", burialGammaName="burial_gamma.dat", membraneGammaName="membrane_gamma.dat", r_min=0.45,min_sequence_separation=10,min_sequence_separation_mem=10,
+                direct_mask_ij=None, water_mask_ij=None, protein_mask_ij=None):
+    # set up masks to reweight contacts
+    if direct_mask_ij is not None and direct_mask_ij.shape != (oa.nres, oa.nres):
+        raise ValueError(f"direct_mask_ij should be of shape {(oa.nres, oa.nres)}, but got {direct_mask_ij.shape}")
+    if water_mask_ij is not None and water_mask_ij.shape != (oa.nres, oa.nres):
+        raise ValueError(f"water_mask_ij should be of shape {(oa.nres, oa.nres)}, but got {water_mask_ij.shape}")
+    if protein_mask_ij is not None and protein_mask_ij.shape != (oa.nres, oa.nres):
+        raise ValueError(f"protein_mask_ij should be of shape {(oa.nres, oa.nres)}, but got {protein_mask_ij.shape}")
+    # set up the rest of the parameters  
     if parametersLocation is None:
         parametersLocation=openawsem.data_path.parameters
     if isinstance(k_contact, float) or isinstance(k_contact, int):
