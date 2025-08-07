@@ -28,7 +28,11 @@ def read_reference_structure_for_q_calculation_4(oa, contact_threshold,rnative_d
                 r_ijN = in_rnative[i][j]/10.0 * nanometers  # convert to nm
                 if r_ijN < contact_threshold:
                     continue
-                sigma_ij = 0.1*abs(i-j)**0.15  # 0.1 nm = 1 A
+                if inSameChain(i,j, oa.chain_starts, oa.chain_ends):
+                    sigma_ij = 0.1*abs(i-j)**0.15  # 0.1 nm = 1 A
+                else: 
+                    N = oa.nres
+                    sigma_ij = 0.1*(1 + N//2)**0.15 # 0.1 nm = 1 A
                 gamma_ij = 1.0
                 i_index = oa.ca[i]
                 j_index = oa.ca[j]
@@ -37,7 +41,31 @@ def read_reference_structure_for_q_calculation_4(oa, contact_threshold,rnative_d
                 structure_interactions.append(structure_interaction)
     return structure_interactions
 
-
+def inSameChain(i,j,chain_starts,chain_ends):
+    # determine whether residues are in the same chain
+    #
+    # sometimes, one of the residues might not exist
+    # we'll treat not existing as being part of a different chain
+    # but it shouldn't really affect anything
+    if i<0 or j<0:
+        if i<0 and j<0:
+            raise AssertionError(f"Residues i and j do not exist! i: {i}, j: {j}")
+        else:
+            return False
+    if i>chain_ends[-1] or j>chain_ends[-1]:
+        if i>chain_ends[-1] and j>chain_ends[-1]:
+            raise AssertionError(f"Residues i and j do not exist! i: {i}, j: {j}")
+        else:
+            return False
+    # if we've made it this far, we know that both residues exist
+    wombat = [int(chain_start<=i and i<=chain_end) for chain_start,chain_end in zip(chain_starts,chain_ends)]
+    assert sum(wombat) == 1, f"i: {i}, chain_starts: {chain_starts}, chain_ends: {chain_ends}, list: {wombat}"
+    chain_index_1 = wombat.index(1)
+    wombat = [int(chain_start<=j and j<=chain_end) for chain_start,chain_end in zip(chain_starts,chain_ends)]
+    assert sum(wombat) == 1, f"j: {j}, chain_starts: {chain_starts}, chain_ends: {chain_ends}, list: {wombat}"
+    chain_index_2 = wombat.index(1)
+    same_chain = chain_index_1==chain_index_2
+    return same_chain
 
 def q_value_dat(oa, contact_threshold, rnative_dat="rnative.dat", min_seq_sep=3, max_seq_sep=np.inf):
     ### Added by Mingchen
