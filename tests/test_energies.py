@@ -61,19 +61,18 @@ def set_up_forces(oa, protein, force_name=None):
         "Contact": lambda: openawsem.functionTerms.contactTerms.contact_term(oa),
         "Chain": lambda: openawsem.functionTerms.basicTerms.chain_term(oa),
         "Chi": lambda: openawsem.functionTerms.basicTerms.chi_term(oa),
-        "Excluded": lambda: openawsem.functionTerms.basicTerms.excl_term(oa, periodic=False),
+        "Excluded": lambda: openawsem.functionTerms.basicTerms.excl_term(oa),
         "RamaProline": lambda: openawsem.functionTerms.basicTerms.rama_proline_term(oa),
         "RamaSSWeight": lambda: openawsem.functionTerms.basicTerms.rama_ssweight_term(oa, k_rama_ssweight=2*8.368, ssweight_file=data_path/f'{protein}-ssweight'),
-        "Beta1": lambda: openawsem.functionTerms.hydrogenBondTerms.beta_term_1(oa),
-        "Beta2": lambda: openawsem.functionTerms.hydrogenBondTerms.beta_term_2(oa),
-        "Beta3": lambda: openawsem.functionTerms.hydrogenBondTerms.beta_term_3(oa),
+        "Beta1": lambda: openawsem.functionTerms.hydrogenBondTerms.beta_term_1(oa,ssweight_file=data_path/f'{protein}-ssweight'),
+        "Beta2": lambda: openawsem.functionTerms.hydrogenBondTerms.beta_term_2(oa,ssweight_file=data_path/f'{protein}-ssweight'),
+        "Beta3": lambda: openawsem.functionTerms.hydrogenBondTerms.beta_term_3(oa,ssweight_file=data_path/f'{protein}-ssweight'),
         "Helical": lambda: openawsem.functionTerms.hydrogenBondTerms.helical_term(oa),
-        "Pap1": lambda: openawsem.functionTerms.hydrogenBondTerms.pap_term_1(oa),
-        "Pap2": lambda: openawsem.functionTerms.hydrogenBondTerms.pap_term_2(oa),
+        "Pap1": lambda: openawsem.functionTerms.hydrogenBondTerms.pap_term_1(oa,ssweight_file=data_path/f'{protein}-ssweight'),
+        "Pap2": lambda: openawsem.functionTerms.hydrogenBondTerms.pap_term_2(oa,ssweight_file=data_path/f'{protein}-ssweight'),
         "FragmentMemory": lambda: openawsem.functionTerms.templateTerms.fragment_memory_term(oa, frag_file_list_file=data_path/f'{protein}-single_frags.mem', npy_frag_table=data_path/f'{protein}-single_frags.npy', UseSavedFragTable=False),
         "DebyeHuckel": lambda: openawsem.functionTerms.debyeHuckelTerms.debye_huckel_term(oa, chargeFile=data_path/f'{protein}-charge.txt'),
     }
-
     forces = []
     if force_name:
         if force_name not in all_forces:
@@ -110,7 +109,6 @@ def analyze(protein, simulation_platform):
                        "Q": 1, "Rg": 2, "Qc": 3, "Helix_orientation": 18, "Pulling": 19}
 
     termEnergies = pd.DataFrame(columns=["Step"] + COLUMNS)
-
     for step in range(len(pdb_trajectory)):
         simulation.context.setPositions(pdb_trajectory.openmm_positions(step))
         e = []

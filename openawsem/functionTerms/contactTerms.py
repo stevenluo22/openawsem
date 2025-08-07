@@ -39,6 +39,31 @@ def inWhichChain(residueId, chain_ends):
         else:
             return chain_table[i]
 
+def inSameChain(i,j,chain_starts,chain_ends):
+    # determine whether residues are in the same chain
+    #
+    # sometimes, one of the residues might not exist
+    # we'll treat not existing as being part of a different chain
+    # but it shouldn't really affect anything
+    if i<0 or j<0:
+        if i<0 and j<0:
+            raise AssertionError(f"Residues i and j do not exist! i: {i}, j: {j}")
+        else:
+            return False
+    if i>chain_ends[-1] or j>chain_ends[-1]:
+        if i>chain_ends[-1] and j>chain_ends[-1]:
+            raise AssertionError(f"Residues i and j do not exist! i: {i}, j: {j}")
+        else:
+            return False
+    # if we've made it this far, we know that both residues exist
+    wombat = [int(chain_start<=i and i<=chain_end) for chain_start,chain_end in zip(chain_starts,chain_ends)]
+    assert sum(wombat) == 1, f"i: {i}, chain_starts: {chain_starts}, chain_ends: {chain_ends}, list: {wombat}"
+    chain_index_1 = wombat.index(1)
+    wombat = [int(chain_start<=j and j<=chain_end) for chain_start,chain_end in zip(chain_starts,chain_ends)]
+    assert sum(wombat) == 1, f"j: {j}, chain_starts: {chain_starts}, chain_ends: {chain_ends}, list: {wombat}"
+    chain_index_2 = wombat.index(1)
+    same_chain = chain_index_1==chain_index_2
+    return same_chain
 
 def inSameChain(i,j,chain_starts,chain_ends):
     # determine whether residues are in the same chain
@@ -154,10 +179,8 @@ def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.
     for i in range(oa.nres):
         for j in range(oa.nres):
             resId1 = i
-            chain1 = inWhichChain(resId1, oa.chain_ends)
             resId2 = j
-            chain2 = inWhichChain(resId2, oa.chain_ends)
-            if abs(resId1-resId2)-min_sequence_separation >= 0 or chain1 != chain2:
+            if abs(resId1-resId2)-min_sequence_separation >= 0 or not inSameChain(resId1, resId2, oa.chain_starts, oa.chain_ends):
                 res_table[0][i][j] = 1
             else:
                 res_table[0][i][j] = 0
@@ -187,10 +210,8 @@ def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.
         for i in range(oa.nres):
             for j in range(oa.nres):
                 resId1 = i
-                chain1 = inWhichChain(resId1, oa.chain_ends)
                 resId2 = j
-                chain2 = inWhichChain(resId2, oa.chain_ends)
-                if abs(resId1-resId2)-min_sequence_separation_mem >= 0 or chain1 != chain2:
+                if abs(resId1-resId2)-min_sequence_separation_mem >= 0 or not inSameChain(resId1, resId2, oa.chain_starts, oa.chain_ends):
                     res_table[m][i][j] = 1
                 else:
                     res_table[m][i][j] = 0
@@ -207,6 +228,13 @@ def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.
     contact.addTabulatedFunction("protein_gamma_ijm", Discrete3DFunction(nwell, 20, 20, protein_gamma_ijm.T.flatten()))
     contact.addTabulatedFunction("burial_gamma_ij", Discrete2DFunction(20, 3, burial_gamma.T.flatten()))
     contact.addTabulatedFunction("res_table", Discrete3DFunction(nwell, oa.nres, oa.nres, res_table.T.flatten()))
+    contact.addTabulatedFunction("inSameChain",Discrete2DFunction(oa.nres, oa.nres, np.array([[int(inSameChain(i,j,oa.chain_starts,oa.chain_ends)) for j in range(oa.nres)] for i in range(oa.nres)]).T.flatten()))
+    if direct_mask_ij is not None:
+        contact.addTabulatedFunction("direct_ij", Discrete2DFunction(oa.nres,oa.nres,direct_mask_ij.T.flatten()))
+    if protein_mask_ij is not None:
+        contact.addTabulatedFunction("protein_ij", Discrete2DFunction(oa.nres,oa.nres,protein_mask_ij.T.flatten()))
+    if water_mask_ij is not None:
+        contact.addTabulatedFunction("water_ij", Discrete2DFunction(oa.nres,oa.nres,water_mask_ij.T.flatten()))
 
     contact.addPerParticleParameter("resName")
     contact.addPerParticleParameter("resId")
@@ -225,83 +253,59 @@ def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.
     # replace cb with ca for GLY
     cb_fixed = [x if x > 0 else y for x,y in zip(oa.cb,oa.ca)]
     none_cb_fixed = [i for i in range(oa.natoms) if i not in cb_fixed]
+    assert len(cb_fixed) == oa.nres, f"Number of atoms in cb_fixed (non-GLY CB and GLY CA atoms), {len(cb_fixed)}, does not match number of residues {oa.nres}."
     # print(oa.natoms, len(oa.resi), oa.resi, seq)
     for i in range(oa.natoms):
-        contact.addParticle([gamma_se_map_1_letter[seq[oa.resi[i]]], oa.resi[i], int(i in cb_fixed)])
+        contact.addParticle([gamma_se_map_1_letter[seq[oa.resi[i]]], oa.resi[i], int(i in cb_fixed),]) 
 
+    # SET UP PAIRWISE FORCE
+    def base_contact_energy(inMembrane):
+        # to avoid nested if statements, DIRECT_MASK, WATER_MASK, and PROTEIN_MASK
+        # will be replaced later
+        direct_base = f"DIRECT_MASK gamma_ijm({inMembrane}, resName1, resName2)"
+        water_base = f"WATER_MASK sigma_water*water_gamma_ijm({inMembrane}, resName1, resName2)"
+        protein_base = f"PROTEIN_MASK sigma_protein*protein_gamma_ijm({inMembrane}, resName1, resName2)"
+        return f"res_table({inMembrane},resId1,resId2)*({direct_base}*theta+thetaII*({water_base}+{protein_base}))"
 
+    #Modify the contact force to include z-dependent membrane interaction
     if z_dependent:
-        # print(f"0.5*tanh({eta_switching}*(z+{z_m}))+0.5*tanh({eta_switching}*({z_m}-z))")
-        contact.addComputedValue("alphaMembrane", f"0.5*tanh({eta_switching}*((z-{membrane_center})+{z_m}))+0.5*tanh({eta_switching}*({z_m}-(z-{membrane_center})))", CustomGBForce.SingleParticle)
-        # contact.addComputedValue("alphaMembrane", f"z", CustomGBForce.SingleParticle)
-        # contact.addComputedValue("isInMembrane", f"z", CustomGBForce.SingleParticle)
-        # contact.addComputedValue("isInMembrane", f"step({z_m}-abs(z))", CustomGBForce.SingleParticle)
-
-        # mediated and direct term (write separately may lead to bug)
-        contact.addEnergyTerm(f"isCb1*isCb2*((1-alphaMembrane1*alphaMembrane2)*water_part+alphaMembrane1*alphaMembrane2*membrane_part);\
-                                water_part=-res_table(0, resId1, resId2)*{k_contact}*\
-                                (gamma_ijm(0, resName1, resName2)*theta+thetaII*(sigma_water*water_gamma_ijm(0, resName1, resName2)+\
-                                sigma_protein*protein_gamma_ijm(0, resName1, resName2)));\
-                                membrane_part=-res_table(1, resId1, resId2)*{k_contact}*\
-                                (gamma_ijm(1, resName1, resName2)*theta+thetaII*(sigma_water*water_gamma_ijm(1, resName1, resName2)+\
-                                sigma_protein*protein_gamma_ijm(1, resName1, resName2)));\
-                                sigma_protein=1-sigma_water;\
-                                theta=0.25*(1+tanh({eta}*(r-{r_min})))*(1+tanh({eta}*({r_max}-r)));\
-                                thetaII=0.25*(1+tanh({eta}*(r-{r_minII})))*(1+tanh({eta}*({r_maxII}-r)));\
-                                sigma_water=0.25*(1-tanh({eta_sigma}*(rho1-{rho_0})))*(1-tanh({eta_sigma}*(rho2-{rho_0})))",
-                                CustomGBForce.ParticlePair)
-
-
-
-        # # mediated term
-        # contact.addEnergyTerm("isCb1*isCb2*((1-alphaMembrane1*alphaMembrane2)*water_part+alphaMembrane1*alphaMembrane2*membrane_part);\
-        #                         water_part=-res_table(0, resId1, resId2)*k_contact*thetaII*\
-        #                         (sigma_water*water_gamma_ijm(0, resName1, resName2)+\
-        #                         sigma_protein*protein_gamma_ijm(0, resName1, resName2));\
-        #                         membrane_part=-res_table(1, resId1, resId2)*k_contact*thetaII*\
-        #                         (sigma_water*water_gamma_ijm(1, resName1, resName2)+\
-        #                         sigma_protein*protein_gamma_ijm(1, resName1, resName2));\
-        #                         sigma_protein=1-sigma_water;\
-        #                         thetaII=0.25*(1+tanh(eta*(r-{r_minII})))*(1+tanh(eta*({r_maxII}-r)));\
-        #                         sigma_water=0.25*(1-tanh({eta_sigma}*(rho1-rho_0)))*(1-tanh({eta_sigma}*(rho2-rho_0)))",
-        #                         CustomGBForce.ParticlePair)
-        # # direct term
-        # contact.addEnergyTerm("isCb1*isCb2*((1-alphaMembrane1*alphaMembrane2)*water_part+alphaMembrane1*alphaMembrane2*membrane_part);\
-        #                         water_part=-res_table(0, resId1, resId2)*k_contact*\
-        #                         gamma_ijm(0, resName1, resName2)*theta;\
-        #                         membrane_part=-res_table(1, resId1, resId2)*k_contact*\
-        #                         gamma_ijm(1, resName1, resName2)*theta;\
-        #                         theta=0.25*(1+tanh(eta*(r-r_min)))*(1+tanh(eta*(r_max-r)))",
-        #                         CustomGBForce.ParticlePair)
+        contact.addComputedValue("alphaMembrane",
+            f"0.5*tanh({eta_switching}*((z-{membrane_center})+{z_m}))+0.5*tanh({eta_switching}*({z_m}-(z-{membrane_center})))",
+            CustomGBForce.SingleParticle)
+        base_energy_string = f"(1-alphaMembrane1*alphaMembrane2)*{base_contact_energy(0)}\
+                              +(alphaMembrane1*alphaMembrane2)*{base_contact_energy(1)};"
     else:
-        # mediated and direct term (write separately may lead to bug)
-        contact.addEnergyTerm(f"-isCb1*isCb2*res_table({inMembrane}, resId1, resId2)*{k_contact}*\
-                                (gamma_ijm({inMembrane}, resName1, resName2)*theta+thetaII*(sigma_water*water_gamma_ijm({inMembrane}, resName1, resName2)+\
-                                sigma_protein*protein_gamma_ijm({inMembrane}, resName1, resName2)));\
-                                sigma_protein=1-sigma_water;\
-                                theta=0.25*(1+tanh({eta}*(r-{r_min})))*(1+tanh({eta}*({r_max}-r)));\
-                                thetaII=0.25*(1+tanh({eta}*(r-{r_minII})))*(1+tanh({eta}*({r_maxII}-r)));\
-                                sigma_water=0.25*(1-tanh({eta_sigma}*(rho1-{rho_0})))*(1-tanh({eta_sigma}*(rho2-{rho_0})))",
-                                CustomGBForce.ParticlePair)
-        # contact.addEnergyTerm(f"-1*rho1*rho2;",
-        #                         CustomGBForce.ParticlePair)
-        #contact.addEnergyTerm(f"isCb*rho_test", CustomGBForce.SingleParticle)
-        # # mediated term
-        # contact.addEnergyTerm(f"-isCb1*isCb2*res_table({inMembrane}, resId1, resId2)*k_contact*thetaII*\
-        #                         (sigma_water*water_gamma_ijm({inMembrane}, resName1, resName2)+\
-        #                         sigma_protein*protein_gamma_ijm({inMembrane}, resName1, resName2));\
-        #                         sigma_protein=1-sigma_water;\
-        #                         thetaII=0.25*(1+tanh(eta*(r-r_minII)))*(1+tanh(eta*(r_maxII-r)));\
-        #                         sigma_water=0.25*(1-tanh({eta_sigma}*(rho1-{rho_0})))*(1-tanh({eta_sigma}*(rho2-{rho_0})))",
-        #                         CustomGBForce.ParticlePair)
-        # # direct term
-        # contact.addEnergyTerm(f"-isCb1*isCb2*res_table({inMembrane}, resId1, resId2)*k_contact*\
-        #                         gamma_ijm({inMembrane}, resName1, resName2)*theta;\
-        #                         theta=0.25*(1+tanh(eta*(r-r_min)))*(1+tanh(eta*(r_max-r)))",
-        #                         CustomGBForce.ParticlePair)
+        base_energy_string = f"{base_contact_energy(inMembrane)};"
 
+    # Modify the base energy string to include weights for direct, water, and protein interactions
+    if direct_mask_ij is not None:
+        base_energy_string = base_energy_string.replace("DIRECT_MASK ", "direct_ij(resId1, resId2)*")
+    else:
+        base_energy_string = base_energy_string.replace("DIRECT_MASK ", "")
+    if protein_mask_ij is not None:
+        base_energy_string = base_energy_string.replace("PROTEIN_MASK ", "protein_ij(resId1, resId2)*")
+    else:
+        base_energy_string = base_energy_string.replace("PROTEIN_MASK", "")
+    if water_mask_ij is not None:
+        base_energy_string = base_energy_string.replace("WATER_MASK", "water_ij(resId1, resId2)*")
+    else:
+        base_energy_string = base_energy_string.replace("WATER_MASK", "")
+    
+    #Add other coefficients and definitions to the energy string
+    coefficients = f"-isCb1*isCb2*{k_contact}*"
+    definitions = f"sigma_protein=1-sigma_water;\
+                    theta=0.25*(1+tanh({eta}*(r-{r_min})))*(1+tanh({eta}*({r_max}-r)));\
+                    thetaII=0.25*(1+tanh({eta}*(r-{r_minII})))*(1+tanh({eta}*({r_maxII}-r)));\
+                    sigma_water=0.25*(1-tanh({eta_sigma}*(rho1-{rho_0})))*(1-tanh({eta_sigma}*(rho2-{rho_0})))"
+    
+    energy_string = f"{coefficients}{base_energy_string}{definitions}"
+    #print("Contact energy string: ", energy_string)
+    
+    # use energy expression to the ParticlePair interaction
+    contact.addEnergyTerm(energy_string, CustomGBForce.ParticlePair)
+
+    # SET UP THE BURIAL FORCE
     if burialPartOn:
-        # burial term
         for i in range(3):
             contact.addGlobalParameter(f"rho_min_{i}", burial_ro_min[i])
             contact.addGlobalParameter(f"rho_max_{i}", burial_ro_max[i])
@@ -309,6 +313,7 @@ def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.
             contact.addEnergyTerm(f"-0.5*isCb*{k_burial}*burial_gamma_ij(resName, {i})*\
                                         (tanh({burial_kappa}*(rho-rho_min_{i}))+\
                                         tanh({burial_kappa}*(rho_max_{i}-rho)))", CustomGBForce.SingleParticle)
+
 
     print("Number of atom: ", oa.natoms, "Number of residue: ", len(cb_fixed))
     # print(len(none_cb_fixed), len(cb_fixed))
@@ -325,7 +330,7 @@ def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.
                 contact.addExclusion(e1, e2)
 
     # contact.setCutoffDistance(1.1)
-    if periodic:
+    if oa.periodic_box:
         contact.setNonbondedMethod(contact.CutoffPeriodic)
         print('\ncontact_term is periodic')
     else:
@@ -336,7 +341,7 @@ def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.
     return contact
 
 
-def contact_term_reference(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0*angstrom, k_relative_mem=1.0, periodic=False, parametersLocation=".", burialPartOn=True, withExclusion=True, forceGroup=22,
+def contact_term_reference(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0*angstrom, k_relative_mem=1.0, parametersLocation=".", burialPartOn=True, withExclusion=True, forceGroup=22,
                 gammaName="gamma.dat", burialGammaName="burial_gamma.dat", membraneGammaName="membrane_gamma.dat", r_min=0.45):
     import pandas
     if isinstance(k_contact, float) or isinstance(k_contact, int):
@@ -403,10 +408,8 @@ def contact_term_reference(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMe
     for i in range(oa.nres):
         for j in range(oa.nres):
             resId1 = i
-            chain1 = inWhichChain(resId1, oa.chain_ends)
             resId2 = j
-            chain2 = inWhichChain(resId2, oa.chain_ends)
-            if abs(resId1-resId2)-min_sequence_separation >= 0 or chain1 != chain2:
+            if abs(resId1-resId2)-min_sequence_separation >= 0 or not inSameChain(resId1, resId2, oa.chain_starts, oa.chain_ends):
                 res_table[0][i][j] = 1
             else:
                 res_table[0][i][j] = 0
@@ -436,10 +439,8 @@ def contact_term_reference(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMe
         for i in range(oa.nres):
             for j in range(oa.nres):
                 resId1 = i
-                chain1 = inWhichChain(resId1, oa.chain_ends)
                 resId2 = j
-                chain2 = inWhichChain(resId2, oa.chain_ends)
-                if abs(resId1-resId2)-min_sequence_separation_mem >= 0 or chain1 != chain2:
+                if abs(resId1-resId2)-min_sequence_separation_mem >= 0 or not inSameChain(resId1, resId2, oa.chain_starts, oa.chain_ends):
                     res_table[m][i][j] = 1
                 else:
                     res_table[m][i][j] = 0
@@ -577,7 +578,7 @@ def contact_term_reference(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMe
                 contact.addExclusion(e1, e2)
 
     # contact.setCutoffDistance(1.1)
-    if periodic:
+    if oa.periodic_box:
         contact.setNonbondedMethod(contact.CutoffPeriodic)
     else:
         contact.setNonbondedMethod(contact.CutoffNonPeriodic)
@@ -587,7 +588,7 @@ def contact_term_reference(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMe
     return contact
 
 def index_based_contact_term(oa, gamma_folder="ff_contact", k_contact=4.184, z_dependent=False, z_m=1.5, inMembrane=False, 
-            membrane_center=0*angstrom, k_relative_mem=1.0, periodic=False, parametersLocation=".", burialPartOn=True, withExclusion=True, r_min=0.45, forceGroup=22):
+            membrane_center=0*angstrom, k_relative_mem=1.0, parametersLocation=".", burialPartOn=True, withExclusion=True, r_min=0.45, forceGroup=22):
     if isinstance(k_contact, float) or isinstance(k_contact, int):
         k_contact = k_contact * oa.k_awsem   # just for backward comptable
     elif isinstance(k_contact, Quantity):
@@ -640,10 +641,8 @@ def index_based_contact_term(oa, gamma_folder="ff_contact", k_contact=4.184, z_d
     for i in range(oa.nres):
         for j in range(oa.nres):
             resId1 = i
-            chain1 = inWhichChain(resId1, oa.chain_ends)
             resId2 = j
-            chain2 = inWhichChain(resId2, oa.chain_ends)
-            if abs(resId1-resId2)-min_sequence_separation >= 0 or chain1 != chain2:
+            if abs(resId1-resId2)-min_sequence_separation >= 0 or not inSameChain(resId1, resId2, oa.chain_starts, oa.chain_ends):
                 res_table[m][i][j] = 1
             else:
                 res_table[m][i][j] = 0
@@ -660,10 +659,8 @@ def index_based_contact_term(oa, gamma_folder="ff_contact", k_contact=4.184, z_d
         for i in range(oa.nres):
             for j in range(oa.nres):
                 resId1 = i
-                chain1 = inWhichChain(resId1, oa.chain_ends)
                 resId2 = j
-                chain2 = inWhichChain(resId2, oa.chain_ends)
-                if abs(resId1-resId2)-min_sequence_separation_mem >= 0 or chain1 != chain2:
+                if abs(resId1-resId2)-min_sequence_separation_mem >= 0 or inSameChain(resId1, resId2, oa.chain_starts, oa.chain_ends):
                     res_table[m][i][j] = 1
                 else:
                     res_table[m][i][j] = 0
@@ -752,7 +749,7 @@ def index_based_contact_term(oa, gamma_folder="ff_contact", k_contact=4.184, z_d
                 contact.addExclusion(e1, e2)
 
     # contact.setCutoffDistance(1.1)
-    if periodic:
+    if oa.periodic_box:
         contact.setNonbondedMethod(contact.CutoffPeriodic)
     else:
         contact.setNonbondedMethod(contact.CutoffNonPeriodic)
@@ -763,7 +760,7 @@ def index_based_contact_term(oa, gamma_folder="ff_contact", k_contact=4.184, z_d
 
 
 
-def expand_contact_table_contact_term(oa, k_contact=4.184, periodic=False, pre=None):
+def expand_contact_table_contact_term(oa, k_contact=4.184, pre=None):
     k_contact *= oa.k_awsem
     # combine direct, burial, mediated.
     # default membrane thickness 1.5 nm
@@ -808,10 +805,8 @@ def expand_contact_table_contact_term(oa, k_contact=4.184, periodic=False, pre=N
     for i in range(oa.nres):
         for j in range(oa.nres):
             resId1 = i
-            chain1 = inWhichChain(resId1, oa.chain_ends)
             resId2 = j
-            chain2 = inWhichChain(resId2, oa.chain_ends)
-            if abs(resId1-resId2)-min_sequence_separation >= 0 or chain1 != chain2:
+            if abs(resId1-resId2)-min_sequence_separation >= 0 or not inSameChain(resId1, resId2, oa.chain_starts, oa.chain_ends):
                 res_table[0][i][j] = 1
             else:
                 res_table[0][i][j] = 0
@@ -897,7 +892,7 @@ def expand_contact_table_contact_term(oa, k_contact=4.184, periodic=False, pre=N
     #         contact.addExclusion(e1, e2)
 
     # contact.setCutoffDistance(1.1)
-    if periodic:
+    if oa.periodic_box:
         contact.setNonbondedMethod(contact.CutoffPeriodic)
     else:
         contact.setNonbondedMethod(contact.CutoffNonPeriodic)
@@ -960,7 +955,7 @@ def get_neighbor_res_type(res_pre, res_post):
     return int(table[r1][r2])
 
 
-def hybrid_contact_term(oa, k_contact=4.184, z_m=1.5, membrane_center=0*angstrom, periodic=False, hybrid_gamma_file="hybrid_contact_gamma.dat"):
+def hybrid_contact_term(oa, k_contact=4.184, z_m=1.5, membrane_center=0*angstrom, hybrid_gamma_file="hybrid_contact_gamma.dat"):
     k_contact *= oa.k_awsem
     membrane_center = membrane_center.value_in_unit(nanometer)   # convert to nm
     # combine direct, burial, mediated.
@@ -1023,10 +1018,8 @@ def hybrid_contact_term(oa, k_contact=4.184, z_m=1.5, membrane_center=0*angstrom
         for i in range(oa.nres):
             for j in range(oa.nres):
                 resId1 = i
-                chain1 = inWhichChain(resId1, oa.chain_ends)
                 resId2 = j
-                chain2 = inWhichChain(resId2, oa.chain_ends)
-                if abs(resId1-resId2)-min_sequence_separation >= 0 or chain1 != chain2:
+                if abs(resId1-resId2)-min_sequence_separation >= 0 or not inSameChain(resId1, resId2, oa.chain_starts, oa.chain_ends):
                     res_table[m][i][j] = 1
                 else:
                     res_table[m][i][j] = 0
@@ -1134,7 +1127,7 @@ def hybrid_contact_term(oa, k_contact=4.184, z_m=1.5, membrane_center=0*angstrom
             contact.addExclusion(e1, e2)
 
     # contact.setCutoffDistance(1.1)
-    if periodic:
+    if oa.periodic_box:
         contact.setNonbondedMethod(contact.CutoffPeriodic)
     else:
         contact.setNonbondedMethod(contact.CutoffNonPeriodic)
@@ -1143,7 +1136,7 @@ def hybrid_contact_term(oa, k_contact=4.184, z_m=1.5, membrane_center=0*angstrom
     contact.setForceGroup(18)
     return contact
 
-def disulfide_bond_term(oa, k=1*kilocalorie_per_mole, cutoff=4.2*angstrom, k_bin=100, step_k_bin=20, rho_max=2.2, rho_near=0.2, periodic=False, withExclusion=True, forceGroup=31):
+def disulfide_bond_term(oa, k=1*kilocalorie_per_mole, cutoff=4.2*angstrom, k_bin=100, step_k_bin=20, rho_max=2.2, rho_near=0.2, withExclusion=True, forceGroup=31):
     print("Disulfide Bond term on")
     k = k.value_in_unit(kilojoule_per_mole)   # convert to kilojoule_per_mole, openMM default uses kilojoule_per_mole as energy.
     cutoff = cutoff.value_in_unit(nanometer)
@@ -1182,7 +1175,7 @@ def disulfide_bond_term(oa, k=1*kilocalorie_per_mole, cutoff=4.2*angstrom, k_bin
     #                             CustomGBForce.ParticlePair)
     # disulfide_bond.addEnergyTerm(f"{k_disulfide_bond}*isCb1*isCb2", CustomGBForce.ParticlePair)
     # disulfide_bond.addEnergyTerm(f"{k_disulfide_bond}*isCb1*isCb2*(rho1+rho2)", CustomGBForce.ParticlePair)
-    if periodic:
+    if oa.periodic_box:
         disulfide_bond.setNonbondedMethod(disulfide_bond.CutoffPeriodic)
     else:
         disulfide_bond.setNonbondedMethod(disulfide_bond.CutoffNonPeriodic)
@@ -1207,7 +1200,7 @@ def disulfide_bond_term(oa, k=1*kilocalorie_per_mole, cutoff=4.2*angstrom, k_bin
 
 
 
-def contact_term_shift_well_center(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0*angstrom, k_relative_mem=1.0, periodic=False, parametersLocation=".", burialPartOn=True, withExclusion=True, forceGroup=22,
+def contact_term_shift_well_center(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0*angstrom, k_relative_mem=1.0, parametersLocation=".", burialPartOn=True, withExclusion=True, forceGroup=22,
                 gammaName="gamma.dat", burialGammaName="burial_gamma.dat", membraneGammaName="membrane_gamma.dat", r_min=0.45, wellCenter=None):
     if isinstance(k_contact, float) or isinstance(k_contact, int):
         k_contact = k_contact * oa.k_awsem   # just for backward comptable
@@ -1273,10 +1266,8 @@ def contact_term_shift_well_center(oa, k_contact=4.184, z_dependent=False, z_m=1
     for i in range(oa.nres):
         for j in range(oa.nres):
             resId1 = i
-            chain1 = inWhichChain(resId1, oa.chain_ends)
             resId2 = j
-            chain2 = inWhichChain(resId2, oa.chain_ends)
-            if abs(resId1-resId2)-min_sequence_separation >= 0 or chain1 != chain2:
+            if abs(resId1-resId2)-min_sequence_separation >= 0 or not inSameChain(resId1, resId2, oa.chain_starts, oa.chain_ends):
                 res_table[0][i][j] = 1
             else:
                 res_table[0][i][j] = 0
@@ -1306,10 +1297,8 @@ def contact_term_shift_well_center(oa, k_contact=4.184, z_dependent=False, z_m=1
         for i in range(oa.nres):
             for j in range(oa.nres):
                 resId1 = i
-                chain1 = inWhichChain(resId1, oa.chain_ends)
                 resId2 = j
-                chain2 = inWhichChain(resId2, oa.chain_ends)
-                if abs(resId1-resId2)-min_sequence_separation_mem >= 0 or chain1 != chain2:
+                if abs(resId1-resId2)-min_sequence_separation_mem >= 0 or not inSameChain(resId1, resId2, oa.chain_starts, oa.chain_ends):
                     res_table[m][i][j] = 1
                 else:
                     res_table[m][i][j] = 0
@@ -1527,7 +1516,7 @@ def contact_term_shift_well_center(oa, k_contact=4.184, z_dependent=False, z_m=1
                 contact.addExclusion(e1, e2)
 
     contact.setCutoffDistance(1.2)
-    if periodic:
+    if oa.periodic_box:
         contact.setNonbondedMethod(contact.CutoffPeriodic)
     else:
         contact.setNonbondedMethod(contact.CutoffNonPeriodic)
@@ -1536,7 +1525,11 @@ def contact_term_shift_well_center(oa, k_contact=4.184, z_dependent=False, z_m=1
     contact.setForceGroup(forceGroup)
     return contact
 
+<<<<<<< HEAD
 def burial_term(oa, k_burial=4.184, periodic=False, parametersLocation=None, burialGammaName="burial_gamma.dat", forceGroup=17):
+=======
+def burial_term(oa, k_burial=4.184, parametersLocation=None, burialGammaName="burial_gamma.dat", forceGroup=17):
+>>>>>>> ftclark3-master
     if parametersLocation is None:
         parametersLocation=openawsem.data_path.parameters
     k_burial *= oa.k_awsem
@@ -1594,7 +1587,11 @@ def burial_term(oa, k_burial=4.184, periodic=False, parametersLocation=None, bur
         for e2 in cb_fixed:
             burial.addExclusion(e1, e2)
 
+<<<<<<< HEAD
     if periodic:
+=======
+    if oa.periodic_box:
+>>>>>>> ftclark3-master
         burial.setNonbondedMethod(burial.CutoffPeriodic)
         print('\ncontact_term is periodic')
     else:
@@ -2041,7 +2038,7 @@ def mediated_term(oa, k_mediated=4.184*1.5):
 
 
 
-def index_based_contact_term(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0, k_relative_mem=1.0, periodic=False, pre=None):
+def index_based_contact_term(oa, k_contact=4.184, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0, k_relative_mem=1.0, pre=None):
     z_dependent = False
     inMembrane = False
     k_contact *= oa.k_awsem
@@ -2175,7 +2172,7 @@ def index_based_contact_term(oa, k_contact=4.184, z_dependent=False, z_m=1.5, in
     #         contact.addExclusion(e1, e2)
 
     # contact.setCutoffDistance(1.1)
-    if periodic:
+    if oa.periodic_box:
         contact.setNonbondedMethod(contact.CutoffPeriodic)
     else:
         contact.setNonbondedMethod(contact.CutoffNonPeriodic)

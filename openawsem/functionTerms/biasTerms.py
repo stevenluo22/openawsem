@@ -163,7 +163,7 @@ def qbias_term(oa,reference_pdb_file, q0, reference_chain_name="ALL", k_qbias=10
     qbias = CustomCVForce(f"0.5*{k_qbias}*(q-{q0})^2")
     # qbias = CustomCVForce(f"0.5*{k_qbias}*(q-q0)^2")
     q = q_value(oa, reference_pdb_file, reference_chain_name, min_seq_sep=qbias_min_seq_sep, max_seq_sep=qbias_max_seq_sep, contact_threshold=qbias_contact_threshold)
-    if oa.periodic:
+    if oa.periodic_box:
         q.setUsesPeriodicBoundaryConditions(True)
     qbias.addCollectiveVariable("q", q)
     # qbias.addGlobalParameter("k_qbias", k_qbias)

@@ -81,8 +81,19 @@ def analyze(args):
         print(f"Unknown fileType {fileType}")
     # pdb_trajectory = read_trajectory_pdb_positions(trajectoryPath)
 
+    # check for atoms whose positions are intended to be fixed
+    if args.fixed_residue_indices:
+        with open(args.fixed_residue_indices,'r') as f:
+            for line in f: # only expect 1 line
+                fixed_residue_indices = line.strip().split(',') #expecting a one-line csv
+                fixed_residue_indices = [int(item) for item in fixed_residue_indices]
+                break
+    else:
+        fixed_residue_indices = []
 
-    oa = OpenMMAWSEMSystem(input_pdb_filename, chains=chain, k_awsem=1.0, xml_filename=openawsem.xml, seqFromPdb=seq, includeLigands=args.includeLigands)  # k_awsem is an overall scaling factor that will affect the relevant temperature scales
+    oa = OpenMMAWSEMSystem(input_pdb_filename, chains=chain, k_awsem=1.0, xml_filename=openawsem.xml, seqFromPdb=seq, 
+                           fixed_residue_indices=fixed_residue_indices,periodic_box=args.periodic_box,
+                           includeLigands=args.includeLigands)  # k_awsem is an overall scaling factor that will affect the relevant temperature scales
 
     print(f"using force setup file from {forceSetupFile}")
     spec = importlib.util.spec_from_file_location("forces", forceSetupFile)
@@ -181,6 +192,9 @@ def main(args=None):
     parser.add_argument("--fromOpenMMPDB", action="store_true", default=False)
     parser.add_argument("--fasta", type=str, default="crystal_structure.fasta")
     parser.add_argument("--includeLigands", action="store_true", default=False)
+    parser.add_argument('--periodic_box', type=float, nargs=3, metavar=('X', 'Y', 'Z'), help='Enable periodic boundary conditions with box dimensions in x, y, z (nanometers)')
+    parser.add_argument('--fixed_residue_indices', type=str, default='', help='csv file with indices (not "ids" or "resnums") of residues whose positions should be fixed)')
+
     if args is None:
         args = parser.parse_args()
     else:

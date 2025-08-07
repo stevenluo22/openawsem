@@ -102,7 +102,7 @@ def fragment_memory_term(oa, k_fm=0.04184, frag_file_list_file="./frag.mem", npy
         frag_file_list = []
     else:
         print(f"Loading Fragment files(Gro files)")
-        frag_file_list = pd.read_csv(frag_file_list_file, skiprows=4, sep="\s+", names=["location", "target_start", "fragment_start", "frag_len", "weight"])
+        frag_file_list = pd.read_csv(frag_file_list_file, skiprows=4, sep="\s+", names=["location", "target_start", "fragment_start", "frag_len", "weight"], comment="#")
         interaction_list = set()
     for frag_index in range(len(frag_file_list)):
         location = frag_file_list["location"].iloc[frag_index]
@@ -165,7 +165,7 @@ def fragment_memory_term(oa, k_fm=0.04184, frag_file_list_file="./frag.mem", npy
             interaction_pair_to_bond_index[(i,j)] = index
         # np.save(frag_table_file, (frag_table, interaction_list, interaction_pair_to_bond_index))
         with open(frag_table_file, 'wb') as f:
-            pickle.dump((frag_table, interaction_list, interaction_pair_to_bond_index), f)
+            pickle.dump((frag_table, interaction_list, interaction_pair_to_bond_index), f)    
         print(f"All gro files information have been stored in the {frag_table_file}. \
             \nYou might want to set the 'UseSavedFragTable'=True to speed up the loading next time. \
             \nBut be sure to remove the .npy file if you modify the .mem file. otherwise it will keep using the old frag memeory.")
@@ -205,10 +205,16 @@ def fragment_memory_term(oa, k_fm=0.04184, frag_file_list_file="./frag.mem", npy
 
     fm.addPerBondParameter("index")
 
-    fm.addTabulatedFunction("frag_table",
-            Discrete2DFunction(len(interaction_list), r_table_size, frag_table.T.flatten()))
+    fm.addTabulatedFunction("frag_table", Discrete2DFunction(len(interaction_list), r_table_size, frag_table.T.flatten()))
     
-    if oa.periodic:
+    if debug:
+        x_array = np.arange(frag_table_rmin, frag_table_rmax, frag_table_dr)
+        #y_array = [f"{i}-{j}" for (i, j) in interaction_list]
+        y_array = [f"{oa.resi[i]}-{oa.resi[j]} ({[k for k, v in data_dic.items() if v == i][0][0]}-{[k for k, v in data_dic.items() if v == j][0][0]})" for (i, j) in interaction_list]
+        df = pd.DataFrame(-k_fm * frag_table, columns=x_array, index=y_array) #Energy in kJ
+        df.to_csv("frag_table_debug.csv")
+    
+    if oa.periodic_box:
         fm.setUsesPeriodicBoundaryConditions(True)
         print('\nfragment_memory_term is periodic')
 
