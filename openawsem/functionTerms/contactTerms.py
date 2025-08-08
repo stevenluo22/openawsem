@@ -1525,11 +1525,7 @@ def contact_term_shift_well_center(oa, k_contact=4.184, z_dependent=False, z_m=1
     contact.setForceGroup(forceGroup)
     return contact
 
-<<<<<<< HEAD
 def burial_term(oa, k_burial=4.184, periodic=False, parametersLocation=None, burialGammaName="burial_gamma.dat", forceGroup=17):
-=======
-def burial_term(oa, k_burial=4.184, parametersLocation=None, burialGammaName="burial_gamma.dat", forceGroup=17):
->>>>>>> ftclark3-master
     if parametersLocation is None:
         parametersLocation=openawsem.data_path.parameters
     k_burial *= oa.k_awsem
@@ -1587,11 +1583,7 @@ def burial_term(oa, k_burial=4.184, parametersLocation=None, burialGammaName="bu
         for e2 in cb_fixed:
             burial.addExclusion(e1, e2)
 
-<<<<<<< HEAD
     if periodic:
-=======
-    if oa.periodic_box:
->>>>>>> ftclark3-master
         burial.setNonbondedMethod(burial.CutoffPeriodic)
         print('\ncontact_term is periodic')
     else:
