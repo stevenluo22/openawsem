@@ -216,13 +216,6 @@ def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.
                 else:
                     res_table[m][i][j] = 0
 
-    if not directPartOn:
-        gamma_ijm = np.zeros((nwell, 20, 20))
-    
-    if not mediatedPartOn:
-        water_gamma_ijm = np.zeros((nwell, 20, 20))
-        protein_gamma_ijm = np.zeros((nwell, 20, 20))
-
     contact.addTabulatedFunction("gamma_ijm", Discrete3DFunction(nwell, 20, 20, gamma_ijm.T.flatten()))
     contact.addTabulatedFunction("water_gamma_ijm", Discrete3DFunction(nwell, 20, 20, water_gamma_ijm.T.flatten()))
     contact.addTabulatedFunction("protein_gamma_ijm", Discrete3DFunction(nwell, 20, 20, protein_gamma_ijm.T.flatten()))
