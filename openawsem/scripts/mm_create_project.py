@@ -514,6 +514,9 @@ def main(args=None):
 
     args.keepIds = not args.resetIds
 
+    if args.to and len(args.protein) > 1:
+        raise ValueError("--to flag may not be used with more than one protein given on command line")
+    
     # Set the verbosity level for logging
     if args.verbose >= 2:
         logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s' )

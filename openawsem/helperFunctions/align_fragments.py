@@ -92,7 +92,7 @@ def create_staggered_fasta(fasta_path,frags_path, parent_dir, copy_path=None, ou
                         # 'PLQ': 'W'   # Pyrroloquinoline quinone adduct, found in some enzyme studies
                     }
         
-        fragment_table = pd.read_csv(frags_path, skiprows=4, delim_whitespace=True, names=['Gro', 'seq_init', 'mem_init', 'length', 'strength'])
+        fragment_table = pd.read_csv(frags_path, skiprows=4, delim_whitespace=True, names=['Gro', 'seq_init', 'mem_init', 'length', 'strength'], comment='#')
         #strange_aminoacids = []
         for mem in fragment_table.itertuples():
             gro_file = Path(parent_dir) / mem.Gro
