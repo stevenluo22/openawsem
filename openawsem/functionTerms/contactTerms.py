@@ -66,7 +66,8 @@ def inSameChain(i,j,chain_starts,chain_ends):
     return same_chain
 
 
-def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0*angstrom, k_relative_mem=1.0, parametersLocation=None, directPartOn=True, mediatedPartOn=True, burialPartOn=True, withExclusion=False, forceGroup=22,
+def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.5, inMembrane=False, membrane_center=0*angstrom, k_relative_mem=1.0, parametersLocation=None, 
+                directPartOn=True, mediatedWaterPartOn=True, mediatedProteinPartOn=True, burialPartOn=True, withExclusion=False, forceGroup=22,
                 gammaName="gamma.dat", burialGammaName="burial_gamma.dat", membraneGammaName="membrane_gamma.dat", r_min=0.45,min_sequence_separation=10,min_sequence_separation_mem=10,
                 direct_mask_ij=None, water_mask_ij=None, protein_mask_ij=None):
     # set up masks to reweight contacts
@@ -193,8 +194,10 @@ def contact_term(oa, k_contact=4.184, k_burial = None, z_dependent=False, z_m=1.
     if not directPartOn:
         gamma_ijm = np.zeros((nwell, 20, 20))
     
-    if not mediatedPartOn:
+    if not mediatedWaterPartOn:
         water_gamma_ijm = np.zeros((nwell, 20, 20))
+    
+    if not mediatedProteinPartOn:
         protein_gamma_ijm = np.zeros((nwell, 20, 20))
 
     contact.addTabulatedFunction("gamma_ijm", Discrete3DFunction(nwell, 20, 20, gamma_ijm.T.flatten()))
