@@ -45,7 +45,7 @@ def group_constraint_by_distance(oa, d0=0*angstrom, group1=[oa.ca[0], oa.ca[1]],
 
 def group_constraint_by_distance(oa, d0=0*angstrom, group1=None, group2=None, forceGroup=3, k=1*kilocalorie_per_mole):
     # CustomCentroidBondForce only work with CUDA not OpenCL.
-    # only CA, CB, O has mass. so the group have to include those. Steven Luo: amended the codes to implement only CA atoms for now. Default assignment should be away from forceGroup 3.
+    # only CA, CB, O has mass. so the group have to include those. Default assignment should be away from forceGroup 3.
     if group1 is None or group2 is None:
         raise ValueError("Both group1 and group2 must be provided as lists of residue indices.")
     k = k.value_in_unit(kilojoule_per_mole)   # convert to kilojoule_per_mole, openMM default uses kilojoule_per_mole as energy.
@@ -307,3 +307,17 @@ def measure_from_position_index(oa, x0=10*angstrom, y0=10*angstrom, z0=10*angstr
     harmonic.addCollectiveVariable("sum_z", sum_of_z_coord)
     harmonic.setForceGroup(forceGroup)
     return harmonic
+
+# This function is to allow for openawsem-style force setup of openmm orientational constraints class. Input includes particle indicies, not oa protein residue indicies.
+# For now, will constrain the orientation to initial positions of the particles selected.
+def orientational_constraints(oa, k = 100*kilocalorie_per_mole, particles = None, forceGroup=5):
+    k = k.value_in_unit(kilojoule_per_mole)   # must be converted to kJ/mol
+
+    if particles is None:
+        orient_force = OrientationRestraintForce(k, oa.pdb.positions)
+    else:
+        orient_force = OrientationRestraintForce(k, oa.pdb.positions, particles)
+    
+    orient_force.setForceGroup(forceGroup)
+
+    return orient_force
