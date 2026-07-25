@@ -105,18 +105,21 @@ def fragment_memory_term(oa, k_fm=0.04184, frag_file_list_file="./frag.mem", npy
         print(f"Loading Fragment files(Gro files)")
         frag_file_list = pd.read_csv(frag_file_list_file, skiprows=4, sep="\s+", names=["location", "target_start", "fragment_start", "frag_len", "weight"])
         interaction_list = set()
+    data_array = np.zeros((oa.nres, 10, 5000))
     for frag_index in range(len(frag_file_list)):
         location = frag_file_list["location"].iloc[frag_index]
         frag_name = os.path.join(frag_location_pre, location)
         frag_len = frag_file_list["frag_len"].iloc[frag_index]
         weight = frag_file_list["weight"].iloc[frag_index]
         target_start = frag_file_list["target_start"].iloc[frag_index]  # residue id
+        counter = target_start - 1 # target_start is either 1 or 274, so this shifts us to 0-based indexing
         fragment_start = frag_file_list["fragment_start"].iloc[frag_index]  # residue id
         frag = pd.read_csv(frag_name, skiprows=2, sep="\s+", header=None, names=["Res_id", "Res", "Type", "i", "x", "y", "z"])
-        frag = frag.query(f"Res_id >= {fragment_start} and Res_id < {fragment_start+frag_len} and (Type == 'CA' or Type == 'CB')")
+        frag = frag.query(f"Res_id >= {fragment_start} and Res_id < {fragment_start+frag_len} and (Type == 'CA')")
         w_m = weight
         gamma_ij = 1
         f = frag.values
+        print(f'frag.values: {frag.values}')
         for i in range(len(frag)):
             for j in range(i, len(frag)):
                 res_id_i = frag["Res_id"].iloc[i]
@@ -153,6 +156,12 @@ def fragment_memory_term(oa, k_fm=0.04184, frag_file_list_file="./frag.mem", npy
 
                 raw_frag_table[correspond_target_i][i_j_sep] += w_m*gamma_ij*np.exp((r_array-rm)**2/(-2.0*sigma_ij**2))
                 interaction_list.add((correspond_target_i, correspond_target_j))
+                if i_type == j_type == "CA":
+                    #print(f'target_start: {target_start}, seq_seq: {seq_sep}')
+                    data_array[counter,seq_sep,:] += w_m*gamma_ij*np.exp((r_array-rm)**2/(-2.0*sigma_ij**2))
+            counter += 1
+    np.save("data_array.npy", data_array)
+    exit()
     if (not os.path.isfile(frag_table_file)) or (not UseSavedFragTable):
         # Reduce memory usage.
         print("Saving fragment table as npy file to speed up future calculation.")
