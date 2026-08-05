@@ -242,24 +242,86 @@ class AWSEMSimulationProject:
                     out.write("0.0 0.0\n")
 
     def generate_ssweight_from_fasta(self):
+        """
+        Predict secondary structure for each chain independently,
+        then concatenate the resulting ssweight entries.
+        """
 
-        # Another option for secondary prediction bias generation is using "Predict_Property.sh -i {name}.fasta" to predict from fasta file.
-        # but you need install it from https://github.com/realbigws/Predict_Property.
-        self.run_command(["Predict_Property.sh", "-i", f"{self.name}.fasta"])
-        
-        from_secondary = f"{self.name}_PROP/{self.name}.ss3"
-        toPre = "."
-        to_ssweight = f"{toPre}/ssweight"
-        logging.info("Generating ssweight from fasta")
-        data = pd.read_csv(from_secondary, comment="#", names=["i", "Res", "ss3", "Helix", "Sheet", "Coil"], sep="\s+")
+        fasta_file = f"{self.name}.fasta"
+        to_ssweight = "ssweight"
+
+        # Read FASTA and split into chains
+        chains = []
+        current_header = None
+        current_seq = []
+
+        with open(fasta_file) as f:
+            for line in f:
+                line = line.strip()
+
+                if not line:
+                    continue
+
+                if line.startswith(">"):
+                    if current_header is not None:
+                        chains.append((current_header, "".join(current_seq)))
+
+                    current_header = line[1:]
+                    current_seq = []
+                else:
+                    current_seq.append(line)
+
+            if current_header is not None:
+                chains.append((current_header, "".join(current_seq)))
+
+        logging.info(f"Found {len(chains)} chains in FASTA")
+
         with open(to_ssweight, "w") as out:
-            for i, line in data.iterrows():
-                if line["ss3"] == "H":
-                    out.write("1.0 0.0\n")
-                if line["ss3"] == "E":
-                    out.write("0.0 1.0\n")
-                if line["ss3"] == "C":
-                    out.write("0.0 0.0\n")
+
+            for chain_idx, (header, seq) in enumerate(chains):
+
+                chain_name = header.split(":")[-1]
+
+                work_name = f"{self.name}_chain_{chain_name}"
+
+                tmp_fasta = f"{work_name}.fasta"
+
+                with open(tmp_fasta, "w") as f:
+                    f.write(f">{chain_name}\n")
+                    f.write(seq + "\n")
+
+                logging.info(
+                    f"Predicting secondary structure for chain {chain_name} "
+                    f"({len(seq)} residues)"
+                )
+
+                self.run_command(
+                    ["Predict_Property.sh", "-i", tmp_fasta]
+                )
+
+                ss3_file = f"{work_name}_PROP/{work_name}.ss3"
+
+                data = pd.read_csv(
+                    ss3_file,
+                    comment="#",
+                    names=["i", "Res", "ss3", "Helix", "Sheet", "Coil"],
+                    sep=r"\s+",
+                )
+
+                for _, row in data.iterrows():
+
+                    if row["ss3"] == "H":
+                        out.write("1.0 0.0\n")
+
+                    elif row["ss3"] == "E":
+                        out.write("0.0 1.0\n")
+
+                    else:  # C
+                        out.write("0.0 0.0\n")
+
+        logging.info(
+            f"Generated concatenated ssweight file from {len(chains)} chains"
+        )
                         
     def prepare_membrane_files(self):
         """
